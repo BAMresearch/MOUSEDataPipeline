@@ -53,7 +53,7 @@ This processes all data for a given measurment date [YYYYMMDD]. This is also ava
 ## 2. `process_single_data`
 This processes one single set of datafiles. 
 
-## 3. `observer`
+## 3. `watcher`
 This watches a measurement date and preliminarily processes the files in complete repetitions as they appear.
 
 ## 4. `check_source_files`
@@ -64,5 +64,5 @@ This runs processing_possible for all directories. all missing files are listed.
 ## `checkers`
 This set of methods contains
   1. `processing_possible`: this checks if all the required files are present. 
-  2. `already_processed`: this checks if there is already a processed output file in place. Only used for the observer
+  2. `already_processed`: this checks if there is already a processed output file in place. Only used for the watcher
 

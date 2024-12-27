@@ -50,25 +50,7 @@ class DirectoryProcessor(FileSystemEventHandler):
         assert self.processing_directories.is_dir(), "The specified directory to watch does not exist."
 
 
-    def process_directory(self, dir_path:Path):
-        if not self.translation_needed(dir_path):
-            return
 
-        print(f"Processing directory: {dir_path}")
-
-        eiger_file = next(dir_path.glob('eiger_*_master.h5'), None)
-        if not eiger_file:
-            print(f"No eiger file found for {dir_path}")
-            return
-
-        craw_path = dir_path / 'im_craw.nxs'
-        translated_path = dir_path / 'translated.nxs'
-
-        subprocess.run([
-            'python3', '-m', 'HDF5Translator',
-            '-C', 'data/TranslatorConfigurations/BAM_new_MOUSE_xenocs_translator_configuration.yaml',
-            '-I', str(craw_path), '-O', str(translated_path)
-        ])
 
     def on_created(self, event: FileSystemEvent):
         if event.is_directory:

@@ -1,0 +1,12 @@
+# Define required paths for the MOUSE data pipeline
+# Base directory for processing
+vsi_root: "/Users/bpauw/Documents/BAM/Measurements/newMouseTest/"
+
+# for testing, we set this to the location of the demo data tree.
+saxs_dir: "/Users/bpauw/Documents/BAM/Measurements/newMouseTest/Measurements/SAXS002"
+
+# Directory where all post-translation steps are located
+post_translation_dir: "/Users/bpauw/Code/MOUSEDataPipeline/src"
+
+# Directory where HDF5Translator templates reside
+translator_template_dir: "/Users/bpauw/Documents/BAM/Measurements/newMouseTest/Measurements/SAXS002/data/TranslatorConfigurations"
