@@ -1,0 +1,6 @@
+attrs
+h5py
+hdf5plugin
+numpy
+scikit-image
+git+https://github.com/BAMresearch/HDF5Translator.git
