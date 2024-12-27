@@ -1,10 +1,12 @@
+import logging
 import subprocess
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Tuple
 import attrs
 from defaults_carrier import DefaultsCarrier, load_config_from_yaml
 from checkers import processing_possible
 from YMD_class import YMD
+from logbook2mouse.logbook_reader import Logbook2MouseReader
 
 
 @attrs.define
@@ -12,13 +14,21 @@ class DirectoryProcessor:
     """
     A class to manage and execute directory processing tasks.
     """
-    defaults_carrier: DefaultsCarrier = attrs.field()
-
+    defaults: DefaultsCarrier = attrs.field(validator=attrs.validators.instance_of(DefaultsCarrier))
+    logbook_reader: Logbook2MouseReader = attrs.field(init=False, default=None)
+    logger: logging.Logger = attrs.field(init=False, default=None)
+    
     def __attrs_post_init__(self):
         """
         Post-initialization setup.
         """
-        assert self.translator_config.exists(), f"Translator configuration file does not exist: {self.translator_config}"
+        self.logger = self.defaults.logger
+        self.logger.debug(f"Initializing {self.__class__.__name__}...")
+        # Initialize the logbook reader
+        self.logbook_reader = Logbook2MouseReader(
+            self.defaults.logbook_file, 
+            project_base_path=self.defaults.projects_dir
+        )
 
     def process_directory(
         self, 
@@ -28,13 +38,45 @@ class DirectoryProcessor:
         repetition: Optional[int] = None
     ):
         """
-        Processes a single repetition directory.
+        Processes a single repetition directory through a sequence of steps.
+        """
+        # Parse input arguments and get the directory path
+        single_dir, ymd, batch, repetition = self._resolve_directory(
+            single_dir=single_dir, ymd=ymd, batch=batch, repetition=repetition
+        )
+
+        # Validate processing preconditions
+        if not processing_possible(single_dir):
+            print(f"Processing not possible for {single_dir}")
+            return
+
+        print(f"Processing directory: {single_dir}")
+
+        # Step 1: Locate Eiger file
+        eiger_file = self._locate_eiger_file(single_dir)
+        if not eiger_file:
+            print(f"No Eiger file found in {single_dir}")
+            return
+
+        # Step 2: Define paths and run subprocess
+        self._run_processing_pipeline(single_dir, ymd, batch, repetition, eiger_file)
+
+    def _resolve_directory(
+        self, 
+        single_dir: Optional[Path], 
+        ymd: Optional[str], 
+        batch: Optional[int], 
+        repetition: Optional[int]
+    ) -> Tuple[Path, YMD, int, int]:
+        """
+        Resolves and validates the input arguments to determine the directory path and metadata.
         """
         if single_dir:
             # Generate YMD, batch, and repetition from single_dir
             assert single_dir.is_dir(), f"Provided path is not an existing directory: {single_dir}"
             ymd, batch, repetition = self._extract_metadata_from_path(single_dir)
         else:
+            # Ensure all required metadata is provided
             assert ymd and batch and repetition, "Either single_dir or ymd, batch, and repetition must be provided."
             ymd = YMD(ymd)
             batch = int(batch)
@@ -42,26 +84,9 @@ class DirectoryProcessor:
             single_dir = self._get_directory_path(ymd, batch, repetition)
             assert single_dir.is_dir(), f"Directory (generated from supplied ymd, batch and repetition) does not exist: {single_dir}"
 
-        if not processing_possible(single_dir):
-            print(f"Processing not possible for {single_dir}")
-            return
+        return single_dir, ymd, batch, repetition
 
-        print(f"Processing directory: {single_dir}")
-
-        # Locate Eiger file
-        eiger_file = next(single_dir.glob('eiger_*_master.h5'), None)
-        if not eiger_file:
-            print(f"No Eiger file found in {single_dir}")
-            return
-
-        # Define input and output paths
-        craw_path = single_dir / 'im_craw.nxs'
-        translated_path = single_dir / f'{ymd}_{batch}_{repetition}.nxs'
-
-        # Run translator subprocess
-        self._run_subprocess(craw_path, translated_path)
-
-    def _extract_metadata_from_path(self, dir_path: Path):
+    def _extract_metadata_from_path(self, dir_path: Path) -> Tuple[YMD, int, int]:
         """
         Extracts YMD, batch, and repetition metadata from a directory path.
         """
@@ -75,7 +100,7 @@ class DirectoryProcessor:
         """
         Constructs the directory path from YMD, batch, and repetition.
         """
-        return self.defaults_carrier.data_dir / ymd.get_year() / f"{ymd}_{batch}_{repetition}"
+        return self.defaults.data_dir / ymd.get_year() / f"{ymd}_{batch}_{repetition}"
 
     def _run_subprocess(self, input_file: Path, output_file: Path):
         """
@@ -112,14 +137,14 @@ def main():
     args = parser.parse_args()
 
     # Load DefaultsCarrier
-    defaults_carrier = DefaultsCarrier(**load_config_from_yaml(args.config))
+    defaults = DefaultsCarrier(**load_config_from_yaml(args.config))
 
     # Instantiate DirectoryProcessor
     processor = DirectoryProcessor(
-        defaults_carrier=defaults_carrier,
+        defaults=defaults,
     )
 
-    # Process directory
+    # Process a single directory
     processor.process_directory(
         single_dir=Path(args.single_dir) if args.single_dir else None,
         ymd=args.ymd,

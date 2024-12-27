@@ -52,7 +52,7 @@ class DefaultsCarrier:
     saxs_dir: Optional[Path] = attrs.field(default=None, converter=convert_to_path_or_none, validator=[if_not_none_is_path_and_exists])
     data_dir: Optional[Path] = attrs.field(default=None, converter=convert_to_path_or_none, validator=[if_not_none_is_path_and_exists])
     masks_dir: Optional[Path] = attrs.field(default=None, converter=convert_to_path_or_none, validator=[if_not_none_is_path_and_exists])
-    proposals_dir: Optional[Path] = attrs.field(default=None, converter=convert_to_path_or_none, validator=[if_not_none_is_path_and_exists])
+    projects_dir: Optional[Path] = attrs.field(default=None, converter=convert_to_path_or_none, validator=[if_not_none_is_path_and_exists])
 
     logbook_file: Optional[Path] = attrs.field(default=None, converter=convert_to_path_or_none, validator=[if_not_none_is_path_and_exists])
     logging_level: str = attrs.field(default='INFO', converter=str)
@@ -71,7 +71,7 @@ class DefaultsCarrier:
         self.data_dir = self.data_dir or self.saxs_dir / 'data'
         self.masks_dir = self.masks_dir or self.data_dir / 'Masks'
         self.logbooks = self.logbooks or self.saxs_dir / 'logbooks'
-        self.proposals_dir = self.proposals_dir or self.vsi_root / 'Proposals' / 'SAXS002'
+        self.projects_dir = self.projects_dir or self.vsi_root / 'Proposals' / 'SAXS002'
 
         self.logger.info("DefaultsCarrier initialized with provided or default paths.")
 
@@ -114,7 +114,7 @@ def create_defaults_carrier_from_config(config_file: Optional[str] = None) -> De
         data_dir=config.get('data_dir', None),
         masks_dir=config.get('masks_dir', None),
         logbooks=config.get('logbooks', None),
-        proposals_dir=config.get('proposals_dir', None),
+        projects_dir=config.get('projects_dir', None),
         logging_level=config.get('logging_level', 'INFO'),
         log_to_file=config.get('log_to_file', False),
         log_file=config.get('log_file', None)

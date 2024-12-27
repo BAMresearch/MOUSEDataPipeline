@@ -4,3 +4,4 @@ hdf5plugin
 numpy
 scikit-image
 git+https://github.com/BAMresearch/HDF5Translator.git
+git+https://github.com/BAMresearch/logbook2mouse.git
