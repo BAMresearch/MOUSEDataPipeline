@@ -44,6 +44,11 @@ The directory structure is expected to be organized as:
     │               └─── autoproc  # (processed datafiles)    
 ```
 
+# usage example:  
+
+```zsh
+python src/directory_processor.py --config MOUSE_settings.yaml --single_dir ~/Documents/BAM/Measurements/newMouseTest/Measurements/SAXS002/data/2025/20250101/20250101_21_22  --steps processstep_translator_step_1 processstep_translator_step_2
+```
 
 # top-level methods: 
 
