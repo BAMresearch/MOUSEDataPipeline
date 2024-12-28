@@ -83,7 +83,7 @@ class DirectoryProcessor:
         """
         Constructs the directory path from YMD, batch, and repetition.
         """
-        return self.defaults.data_dir / ymd.get_year() / f"{ymd}_{batch}_{repetition}"
+        return self.defaults.data_dir / ymd.get_year() / str(ymd) / f"{ymd}_{batch}_{repetition}"
 
     def _run_processing_step(self, step_name: str, dir_path: Path, ymd: YMD, batch: int, repetition: int):
         """

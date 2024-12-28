@@ -49,16 +49,16 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
 
         logger.info(f"Starting beam analysis for {input_file}")
         result = subprocess.run(cmd1, check=True, capture_output=True, text=True)
-        print(result.stdout)
+        logger.debug(result.stdout)
         result = subprocess.run(cmd2, check=True, capture_output=True, text=True)
-        print(result.stdout)
+        logger.debug(result.stdout)
         logger.info(f"Completed beam analysis for {input_file}")
     except subprocess.CalledProcessError as e:
         # Print the standard output and standard error
-        print("Subprocess failed with stderr:")
-        print(e.stderr)
+        logger.info("Subprocess failed with stderr:")
+        logger.info(e.stderr)
         # Optionally, also print the standard output
-        print("Subprocess output was:")
-        print(e.stdout)
+        logger.info("Subprocess output was:")
+        logger.info(e.stdout)
         logger.error(f"Error during translator subprocess: {e}")
         raise

@@ -47,7 +47,11 @@ The directory structure is expected to be organized as:
 # usage example:  
 
 ```zsh
-python src/directory_processor.py --config MOUSE_settings.yaml --single_dir ~/Documents/BAM/Measurements/newMouseTest/Measurements/SAXS002/data/2025/20250101/20250101_21_22  --steps processstep_translator_step_1 processstep_translator_step_2
+python src/directory_processor.py --config MOUSE_settings.yaml --single_dir ~/Documents/BAM/Measurements/newMouseTest/Measurements/SAXS002/data/2025/20250101/20250101_21_22  --steps processstep_translator_step_1 processstep_translator_step_2 processstep_beamanalysis
+```
+or 
+```zsh
+python src/directory_processor.py --config MOUSE_settings.yaml --ymd 20250101 --batch 21 --repetition 22 --steps processstep_translator_step_1 processstep_translator_step_2 processstep_beamanalysis
 ```
 
 # top-level methods: 
