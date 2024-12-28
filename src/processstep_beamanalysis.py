@@ -32,17 +32,18 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
 
 
         input_file = dir_path / f'mouse_{ymd}_step_2.nxs'
+        pto_file = defaults.post_translation_dir / 'post_translation_operation_MOUSE_beamanalysis.py'
         cmd1 = [
-            'python3', 'post_translation_operation_MOUSE_beamanalysis.py',
+            'python3', str(pto_file),
             '-f', str(input_file),
             '-v', 
-            '-k', 'roi_size=25', 'image_type="sample_beam"',
+            '-k', 'roi_size=25', 'image_type=sample_beam',
         ]
         cmd2 = [
-            'python3', 'post_translation_operation_MOUSE_beamanalysis.py',
+            'python3', str(pto_file),
             '-f', str(input_file),
             '-v', 
-            '-k', 'roi_size=25', 'image_type="direct_beam"',
+            '-k', 'roi_size=25', 'image_type=direct_beam',
         ]
 
 
