@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import List
 
 
 def already_processed(dir_path: Path) -> bool:
@@ -8,30 +9,35 @@ def already_processed(dir_path: Path) -> bool:
     translated_path = dir_path / 'translated.nxs'
     return translated_path.is_file()
 
-def processing_possible(dir_path: Path) -> bool:
+def len_files_in_path(dir_path: Path, globstring:str = '*') -> int:
+    return len(list(dir_path.glob(globstring)))
+
+
+def processing_possible(dir_path: Path, return_list:bool = False) -> bool:
     """
     This method checks if the processing is needed for a given repetition. 
     """
-    craw_path = dir_path / 'im_craw.nxs'
-    translated_path = dir_path / 'translated.nxs'
+    missing_list = []
 
-    if not craw_path.is_file():
-        return False
-
-    if not (len(craw_path.glob('*/eiger_*_master.h5'))==2):
+    if not (len_files_in_path(dir_path, '*/eiger_*_master.h5')==2):
         # missing direct beam and/or direct beam through sample files
-        return False
+        missing_list.append('*/eiger_*_master.h5')
 
-    if not (len(craw_path.glob('*/im_craw.nxs'))==2):
+    if not (len_files_in_path(dir_path, '*/im_craw.nxs')==2):
         # missing im_craw for direct beam and/or direct beam through sample files
-        return False
+        missing_list.append('*/im_craw.nxs')
 
-    if translated_path.is_file():
-        # already translated
-        return False
-
-    if not len(list(dir_path.glob('eiger_*_master.h5'))) == 1:
+    if not (len_files_in_path(dir_path, 'eiger_*_master.h5') == 1):
         # missing or too many eiger files. 
+        missing_list.append('eiger_*_master.h5')
+
+    if not (len_files_in_path(dir_path, 'im_craw.nxs') == 1):
+        # missing im_craw files. 
+        missing_list.append('im_craw.h5')
+
+    if return_list:
+        return missing_list
+    elif len(missing_list) > 0:
         return False
 
     return True

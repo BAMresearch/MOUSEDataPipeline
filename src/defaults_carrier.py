@@ -70,7 +70,7 @@ class DefaultsCarrier:
         self.saxs_dir = self.saxs_dir or self.vsi_root / 'Measurements' / 'SAXS002'
         self.data_dir = self.data_dir or self.saxs_dir / 'data'
         self.masks_dir = self.masks_dir or self.data_dir / 'Masks'
-        self.logbooks = self.logbooks or self.saxs_dir / 'logbooks'
+        self.logbook_file = self.logbook_file or self.saxs_dir / 'logbooks' / 'logbook_MOUSE.xlsx'
         self.projects_dir = self.projects_dir or self.vsi_root / 'Proposals' / 'SAXS002'
 
         self.logger.info("DefaultsCarrier initialized with provided or default paths.")
@@ -113,7 +113,7 @@ def create_defaults_carrier_from_config(config_file: Optional[str] = None) -> De
         saxs_dir=config.get('saxs_dir', None),
         data_dir=config.get('data_dir', None),
         masks_dir=config.get('masks_dir', None),
-        logbooks=config.get('logbooks', None),
+        logbook_file=config.get('logbook_file', None),
         projects_dir=config.get('projects_dir', None),
         logging_level=config.get('logging_level', 'INFO'),
         log_to_file=config.get('log_to_file', False),
