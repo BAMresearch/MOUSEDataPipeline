@@ -37,8 +37,15 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
             '-d'
         ]
         logger.info(f"Starting translator step 1 for {input_file}")
-        subprocess.run(cmd, check=True)
+        result = subprocess.run(cmd, check=True, capture_output=True, text=True)
+        logger.debug(result.stdout)
         logger.info(f"Completed translator step 1 for {input_file}")
     except subprocess.CalledProcessError as e:
+        # Print the standard output and standard error
+        logger.info("Subprocess failed with stderr:")
+        logger.info(e.stderr)
+        # Optionally, also print the standard output
+        logger.info("Subprocess output was:")
+        logger.info(e.stdout)
         logger.error(f"Error during translator subprocess: {e}")
         raise
