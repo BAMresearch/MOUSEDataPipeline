@@ -4,6 +4,8 @@ from defaults_carrier import DefaultsCarrier
 from logbook2mouse.logbook_reader import Logbook2MouseReader
 import logging
 
+# Flag indicating whether this process step can be executed in parallel on multiple repetitions
+can_process_repetitions_in_parallel = False
 
 def can_run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2MouseReader, logger: logging.Logger) -> bool:
     """
