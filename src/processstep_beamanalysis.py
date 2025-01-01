@@ -11,7 +11,7 @@ can_process_repetitions_in_parallel = True
 
 def can_run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2MouseReader, logger: logging.Logger) -> bool:
     """
-    Checks if the translator step should run. Besides the base files, we don't need anything...
+    Checks if the translator step should run. We need the translated file. 
     """
     ymd, batch, repetition = extract_metadata_from_path(dir_path)
     step_2_file = dir_path / f'mouse_{ymd}_step_2.nxs'
