@@ -7,6 +7,9 @@ from logbook2mouse.logbook_reader import Logbook2MouseReader
 import logging
 
 
+# Flag indicating whether this process step can be executed in parallel on multiple repetitions
+can_process_repetitions_in_parallel = True
+
 def can_run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2MouseReader, logger: logging.Logger) -> bool:
     """
     Checks if the translator step should run. Besides the base files, we don't need anything...

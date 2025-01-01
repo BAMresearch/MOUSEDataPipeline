@@ -3,6 +3,7 @@ import logging
 from pathlib import Path
 from typing import Optional, Tuple, List
 import attrs
+import concurrent
 from defaults_carrier import DefaultsCarrier, load_config_from_yaml
 from checkers import processing_possible
 from YMD_class import YMD, extract_metadata_from_path
@@ -55,6 +56,42 @@ class DirectoryProcessor:
         except Exception as e:
             self.logger.error(f"Error processing directory: {single_dir}. Exception: {e}")
             raise
+
+    def process_batch(self, ymd: str, batch: int, parallel: bool = False):
+        ymd = YMD(ymd)
+        directories = self._get_all_repetitions_directories(ymd, batch)
+
+        for step_name in self.steps:
+            step_module = importlib.import_module(step_name)
+            if not getattr(step_module, "can_process_repetitions_in_parallel", False):
+                logging.info(f'{step_module} cannot process repetitions in parallel.')
+                # Run this step sequentially
+                for directory in directories:
+                    self._run_processing_step(step_name, directory, ymd, batch, None)
+            elif parallel:
+                logging.info(f'using {step_module} to process repetitions in parallel.')
+                # Run this step in parallel
+                self._run_steps_in_parallel(step_name, directories, ymd, batch)
+            else:
+                logging.info(f'{step_module} can process repetitions in parallel, but not requested.')
+                for directory in directories:
+                    self._run_processing_step(step_name, directory, ymd, batch, None)
+
+    def _run_steps_in_parallel(self, step_name: str, directories: List[Path], ymd: YMD, batch: int):
+        print('running in parallel...')
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            futures = [
+                executor.submit(self._run_processing_step, step_name, directory, ymd, batch, None)
+                for directory in directories
+            ]
+            concurrent.futures.wait(futures)
+
+    def _get_all_repetitions_directories(self, ymd: YMD, batch: int) -> List[Path]:
+        """
+        Returns the list of Path objects for all repetition directories in a batch.
+        """
+        base_dir = self.defaults.data_dir / ymd.get_year() / str(ymd)
+        return list(base_dir.glob(f"{ymd}_{batch}_*"))
 
     def _resolve_directory(
         self, 
@@ -117,6 +154,7 @@ def main():
     parser.add_argument('--batch', type=int, help="Batch number (if not using single_dir).")
     parser.add_argument('--repetition', type=int, help="Repetition number (if not using single_dir).")
     parser.add_argument('--steps', type=str, nargs='+', help="List of processing step module names.", required=True)
+    parser.add_argument('--parallel', action='store_true', help="Enable parallel processing of repetitions.")
 
     args = parser.parse_args()
 
@@ -126,13 +164,20 @@ def main():
         steps=args.steps
     )
 
-    processor.process_directory(
-        single_dir=Path(args.single_dir) if args.single_dir else None,
-        ymd=args.ymd,
-        batch=args.batch,
-        repetition=args.repetition
-    )
-
+    if args.single_dir or args.repetition:
+        processor.process_directory(
+            single_dir=Path(args.single_dir) if args.single_dir else None,
+            ymd=args.ymd,
+            batch=args.batch,
+            repetition=args.repetition            
+            )
+    else:
+        assert args.ymd and args.batch, "Processing all repetitions requires YMD and batch."
+        processor.process_batch(
+            ymd=args.ymd, 
+            batch=args.batch, 
+            parallel=args.parallel
+            )
 
 if __name__ == '__main__':
     main()
