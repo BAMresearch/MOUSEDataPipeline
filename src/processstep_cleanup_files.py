@@ -1,11 +1,12 @@
 from pathlib import Path
 import subprocess
+from YMD_class import extract_metadata_from_path
 from defaults_carrier import DefaultsCarrier
 from logbook2mouse.logbook_reader import Logbook2MouseReader
 import logging
 
 doc = """
-WIP: This processing step cleans up the temporary and intermediate files created during the processing
+This processing step cleans up the temporary and intermediate files created during the processing
 """
 
 # Flag indicating whether this process step can be executed in parallel on multiple repetitions
@@ -15,31 +16,27 @@ def can_run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2M
     """
     Checks if the translator step should run.
     """
-    eiger_file = dir_path / 'im_craw.nxs'
-    if eiger_file.exists():
-        logger.debug(f"Translator step can run: Found {eiger_file}")
-        return True
-    logger.debug(f"Translator step skipped: No im_craw.nxs in {dir_path}")
-    return False
-
+    return True # can always run this step
 
 def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2MouseReader, logger: logging.Logger):
     """
     Executes the translator processing step.
     """
+    ymd, batch, repetition = extract_metadata_from_path(dir_path)
+    step_1_file = dir_path / f'mouse_{ymd}_step_1.nxs'
+    # add any other temporary files that might be created during processing
+
     try:
-        input_file = dir_path / 'im_craw.nxs'
-        output_file = dir_path / 'translated.nxs'
-        cmd = [
-            'python3', '-m', 'HDF5Translator',
-            '-C', str(defaults.translator_config),
-            '-I', str(input_file),
-            '-O', str(output_file)
+        filenames = [
+            step_1_file
         ]
-        logger.info(f"Starting translator step for {input_file}")
+        cmd = [
+            'rm', '-f', *filenames
+        ]
+        logger.info(f"Starting cleanup step for {ymd=}, {batch=}, {repetition=}")
         result = subprocess.run(cmd, check=True, capture_output=True, text=True)
         logger.debug(result.stdout)
-        logger.info(f"Completed translator step for {input_file}")
+        logger.info(f"Completed cleanup step for {ymd=}, {batch=}, {repetition=}")
     except subprocess.CalledProcessError as e:
         # Print the standard output and standard error
         logger.info("Subprocess failed with stderr:")
@@ -47,5 +44,5 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
         # Optionally, also print the standard output
         logger.info("Subprocess output was:")
         logger.info(e.stdout)
-        logger.error(f"Error during translator subprocess: {e}")
+        logger.error(f"Error during cleanup subprocess: {e}")
         raise
