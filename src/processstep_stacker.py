@@ -1,5 +1,6 @@
 from pathlib import Path
 import subprocess
+from YMD_class import extract_metadata_from_path
 from defaults_carrier import DefaultsCarrier
 from logbook2mouse.logbook_reader import Logbook2MouseReader
 import logging
@@ -13,14 +14,15 @@ can_process_repetitions_in_parallel = False
 
 def can_run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2MouseReader, logger: logging.Logger) -> bool:
     """
-    Checks if the translator step should run.
+    Checks if the translator step could run.
     """
-    eiger_file = dir_path / 'im_craw.nxs'
-    if eiger_file.exists():
-        logger.debug(f"Translator step can run: Found {eiger_file}")
-        return True
-    logger.debug(f"Translator step skipped: No im_craw.nxs in {dir_path}")
-    return False
+    ymd, batch, repetition = extract_metadata_from_path(dir_path)
+    step_2_file = dir_path / f'mouse_{ymd}_step_2.nxs'
+    if not step_2_file.is_file():
+        logger.info(f"Beamanalysis not possible for {dir_path}, result file missing at: {step_2_file}")
+        return False
+
+    return True
 
 
 def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2MouseReader, logger: logging.Logger):

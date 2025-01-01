@@ -1,5 +1,6 @@
 from pathlib import Path
 import subprocess
+from YMD_class import extract_metadata_from_path
 from defaults_carrier import DefaultsCarrier
 from logbook2mouse.logbook_reader import Logbook2MouseReader
 import logging
@@ -14,39 +15,28 @@ can_process_repetitions_in_parallel = True
 
 def can_run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2MouseReader, logger: logging.Logger) -> bool:
     """
-    Checks if the translator step should run.
+    Checks if the translator step could run.
     """
-    eiger_file = dir_path / 'im_craw.nxs'
-    if eiger_file.exists():
-        logger.debug(f"Translator step can run: Found {eiger_file}")
-        return True
-    logger.debug(f"Translator step skipped: No im_craw.nxs in {dir_path}")
-    return False
+    ymd, batch, repetition = extract_metadata_from_path(dir_path)
+    step_2_file = dir_path / f'mouse_{ymd}_step_2.nxs'
+    if not step_2_file.is_file():
+        logger.info(f"Beamanalysis not possible for {dir_path}, file missing at: {step_2_file}")
+        return False
 
+    return True
 
 def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2MouseReader, logger: logging.Logger):
     """
     Executes the translator processing step.
     """
+    ymd, batch, repetition = extract_metadata_from_path(dir_path)
+    input_file = dir_path / f'mouse_{ymd}_step_2.nxs'
     try:
-        input_file = dir_path / 'im_craw.nxs'
-        output_file = dir_path / 'translated.nxs'
-        cmd = [
-            'python3', '-m', 'HDF5Translator',
-            '-C', str(defaults.translator_config),
-            '-I', str(input_file),
-            '-O', str(output_file)
-        ]
-        logger.info(f"Starting translator step for {input_file}")
-        result = subprocess.run(cmd, check=True, capture_output=True, text=True)
-        logger.debug(result.stdout)
-        logger.info(f"Completed translator step for {input_file}")
-    except subprocess.CalledProcessError as e:
+        logger.info(f"Starting thickness_from_absorption step for {input_file}")
+        # ...
+        logger.info(f"Completed thickness_from_absorption step for {input_file}")
+    except Exception as e:
         # Print the standard output and standard error
-        logger.info("Subprocess failed with stderr:")
-        logger.info(e.stderr)
-        # Optionally, also print the standard output
-        logger.info("Subprocess output was:")
-        logger.info(e.stdout)
-        logger.error(f"Error during translator subprocess: {e}")
-        raise
+        logger.info("thickness_from_absorption step failed with error:")
+        logger.info(e)
+        logger.error(f"Error during thickness_from_absorption step: {e}")

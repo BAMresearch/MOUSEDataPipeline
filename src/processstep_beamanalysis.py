@@ -16,7 +16,7 @@ def can_run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2M
     ymd, batch, repetition = extract_metadata_from_path(dir_path)
     step_2_file = dir_path / f'mouse_{ymd}_step_2.nxs'
     if not step_2_file.is_file():
-        logger.info(f"Beamanalysis not possible for {dir_path}, step 2 result file missing at: {step_2_file}")
+        logger.info(f"Beamanalysis not possible for {dir_path}, file missing at: {step_2_file}")
         return False
 
     return True

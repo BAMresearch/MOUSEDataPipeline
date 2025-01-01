@@ -23,6 +23,7 @@ def can_run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2M
     if not step_2_file.is_file():
         logger.info(f"Mask file determination not possible for {dir_path}, file missing at: {step_2_file}")
         return False
+    return True
 
 def get_configuration(filename: Path, logger: logging.Logger) -> int:
     """
