@@ -11,10 +11,7 @@ Usage:
 """
 
 import argparse
-import os
-import sys
 import h5py
-import numpy as np
 import yaml
 import logging
 from pathlib import Path
@@ -108,166 +105,6 @@ class newNewConcat(object):
                     print(f'** uncaught error with path {path}, skipping...')
 
 
-class nexConcat(object):
-    # """
-    # Concatenates multiple NeXus files *with identical structure* to frames of a single file. 
-    # Useful for combining multiple exposures, structurized using NeXpand, into a series of frames.
-    
-    # All data in a single array in the input nexus files are concatenated along axis NeXusAxis. 
-    # Non-array values are read from the first file and stored in the new file. 
-    # """
-
-    inflist = None
-    ofname = None
-    remove = True
-    bDict = {}
-    allItems = []  # is filled in by self.listStructure
-    # forceDType = {"entry1/frames/data/data_000001": np.float64}
-    # stackItems = [
-    # ...  - now in YAML file..
-    # ]
-
-    def clear(self):
-        self.inflist = []
-        self.stackItems=[],
-        self.ofname = None
-        self.remove = True
-        self.bDict = {}
-        self.allItems = []
-
-    def __init__(
-        self,
-        inflist:list=[],
-        ofname:Path=None,
-        remove=False,
-        stackItems:list=[],
-        NeXpandScriptVersion=None,
-    ):
-        self.clear()
-        self.inflist = inflist
-        self.ofname = ofname
-        self.remove = remove
-        self.NeXpandScriptVersion = NeXpandScriptVersion
-
-        # delete output file if exists, and requested by input flag
-        if os.path.exists(self.ofname) and self.remove:
-            logging.info("file {} exists, removing...".format(self.ofname))
-            os.remove(self.ofname)
-
-        for infile in self.inflist:
-            self.expandBDict(infile)
-
-        self.listStructure(self.inflist[0])
-        # remove stackItems from that list
-        for x in self.stackItems:
-            # print("removing item {} from self.allitems: {} \n \n".format(x, self.allItems))
-            try:
-                self.allItems.remove(x)
-            except ValueError:
-                logging.info("Item {} not found in allItems, skipping...".format(x))
-
-        self.hdfDeepCopy(self.inflist[0], self.ofname)
-        with h5py.File(self.ofname, "a") as h5f:
-            # del h5f["Saxslab"] not the issue here.
-            h5f["/"].attrs["default"] = "entry1"
-
-    def _stackIt(self, name, obj):
-        # print(name)
-        if name in self.stackItems:
-            if name in self.bDict:  # already exists:
-                try:
-                    self.bDict[name].append(
-                        obj[()]
-                    )  # np.stack((self.bDict[name], obj[()]))
-
-                except ValueError:
-                    logging.warning(
-                        "\n\n file: {} \n NeXus path: {} \n value: {}".format(
-                            self.ofname, name, obj[()]
-                        )
-                    )
-                    logging.warning(
-                        "\n\n bDict[name]: {} \n bDict[name] shape: {} \n value shape: {}".format(
-                            self.bDict[name], self.bDict[name].shape, obj[()].shape
-                        )
-                    )
-                    raise
-                except:
-                    raise
-            else:  # create entry
-                self.bDict[name] = [obj[()]]  # list of entries
-
-    def expandBDict(self, filename):
-
-        with h5py.File(filename, "r") as h5f:
-
-            h5f.visititems(self._stackIt)
-
-    def hdfDeepCopy(self, ifname, ofname):
-        """Copies the internals of an open HDF5 file object (infile) to a second file, 
-        replacing the content with stacked data where necessary..."""
-        with h5py.File(ofname, "a") as h5o, h5py.File(
-            ifname, "r"
-        ) as h5f:  # create file, truncate if exists
-            # first copy stacked items, adding attributes from infname
-            for nxPath in self.stackItems:
-                gObj = h5f.get(nxPath, default=None)
-                if gObj is None:
-                    # print("Path {} not present in input file {}".format(nxPath, ifname))
-                    return
-
-                # print("Creating dataset at path {}".format(nxPath))
-                # if nxPath in self.forceDType.keys():
-                #     logging.debug("forcing dType {}".format(self.forceDType[nxPath]))
-                #     oObj = h5o.create_dataset(
-                #         nxPath,
-                #         data=np.stack(self.bDict[nxPath]),
-                #         dtype=self.forceDType[nxPath],
-                #         compression="gzip",
-                #     )
-                # else:
-                oObj = h5o.create_dataset(
-                    nxPath, data=np.stack(self.bDict[nxPath]), compression="gzip"
-                )
-                oObj.attrs.update(gObj.attrs)
-
-            # now copy the rest, skipping what is already there.
-            for nxPath in self.allItems:
-                # do not copy groups...
-                oObj = h5o.get(nxPath, default="NonExistentGroup")
-                if isinstance(oObj, h5py.Group):
-                    # skip copying the group, but ensure all attributes are there..
-                    gObj = h5f.get(nxPath, default=None)
-                    if gObj is not None:
-                        oObj.attrs.update(gObj.attrs)
-                    continue  # skippit
-
-                groupLoc = nxPath.rsplit("/", maxsplit=1)[0]
-                if len(groupLoc) > 0:
-                    gl = h5o.require_group(groupLoc)
-                    # copy group attributes
-                    oObj = h5f.get(groupLoc)
-                    gl.attrs.update(oObj.attrs)
-
-                    try:
-                        h5f.copy(nxPath, gl)
-                    except (RuntimeError, ValueError):
-                        pass
-                        # print("Skipping path {}, already exists...".format(nxPath))
-                    except:
-                        raise
-
-    def listStructure(self, ifname):
-        """ reads all the paths to the items into a list """
-
-        def addName(name):
-            self.allItems += [name]
-
-        with h5py.File(ifname, "r") as h5f:
-            h5f.visit(addName)
-        # print(self.allItems)
-
-
 # If you are adjusting the template for your needs, you probably only need to touch the main function:
 def main(
     output: Path,
@@ -291,7 +128,6 @@ def main(
     assert stack_datasets is not None, "The configuration file must contain a 'stack_datasets' section."
     # Stack the datasets
     newNewConcat(output, auxiliary_files, stack_datasets)
-
 
     logging.info("Post-translation processing complete.")
 
