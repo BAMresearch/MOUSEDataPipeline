@@ -9,7 +9,7 @@ from logbook2mouse.logbook_reader import Logbook2MouseReader
 import logging
 
 doc = """
-WIP: This processing step updates the metadata with the estimated thickness from the 
+This processing step updates the metadata with the estimated thickness from the 
 X-ray absorption and the X-ray absorption coefficient calculated from the composition. 
 """
 
@@ -34,15 +34,15 @@ def get_absorption(filename: Path, logger: logging.Logger) -> float:
     """
     try:
         with h5py.File(filename, 'r') as h5f:
-            transmission = h5f['/entry1/sample/transmission'][()]
+            transmission = h5f['/entry1/sample/transmission'][()].mean()
     except Exception as e:
-        logger.warning(f'could not read absorption from {filename} with error {e}')
+        logger.warning(f'could not read transmission from {filename} with error {e}')
         return 0.0
-    if not isinstance(transmission, float):
-        logger.warning(f'absorption not found in file {filename}')
+    if not isinstance(transmission, np.floating):
+        logger.warning(f'transmission not found in file {filename}')
         return 0.0
     if not (0 < transmission <= 1):
-        logger.warning(f'absorption value {transmission} is not in the range [0, 1]')
+        logger.warning(f'transmission value {transmission} is not in the range [0, 1]')
         return 0.0
     return 1 - transmission
 
@@ -56,7 +56,7 @@ def get_absorption_coefficient(filename: Path, logger: logging.Logger) -> float:
     except Exception as e:
         logger.warning(f'could not read absorption coefficient from {filename} with error {e}')
         return 0.0
-    if not isinstance(absorption_coefficient, float):
+    if not isinstance(absorption_coefficient, np.floating):
         logger.warning(f'absorption coefficient not found in file {filename}')
         return 0.0
     if absorption_coefficient <= 0:
@@ -91,9 +91,9 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
         thickness = calculate_thickness(absorption_coefficient, absorption, logger)
         with h5py.File(input_file, 'a') as h5f:
             # this will be stacked into a list of thicknesses... 
-            thickness = h5f.require_dataset('/entry1/sample/absorptionDerivedThicknesses', shape=(), dtype=h5py.special_dtype(vlen=str))
-            thickness[...] = thickness
-            thickness.attrs['units'] = 'm'
+            tloc = h5f.require_dataset('/entry1/sample/absorptionDerivedThicknesses', shape=(), dtype=np.float32)
+            tloc[...] = thickness
+            tloc.attrs['units'] = 'm'
 
         logger.info(f"Completed thickness_from_absorption step for {input_file}")
     except Exception as e:

@@ -2,13 +2,13 @@ from pathlib import Path
 import subprocess
 
 import h5py
-from YMD_class import extract_metadata_from_path
+from YMD_class import YMD, extract_metadata_from_path
 from defaults_carrier import DefaultsCarrier
 from logbook2mouse.logbook_reader import Logbook2MouseReader
 import logging
 
 doc = """
-WIP: This processing step finds the correct mask file for this measurement and adds it to the metadata
+This processing step finds the correct mask file for this measurement and adds it to the metadata
 """
 
 # Flag indicating whether this process step can be executed in parallel on multiple repetitions
@@ -41,7 +41,7 @@ from pathlib import Path
 import logging
 from datetime import datetime
 
-def find_appropriate_mask(defaults: DefaultsCarrier, measurement_ymd: str, configuration: int, logger: logging.Logger) -> Path:
+def find_appropriate_mask(defaults: DefaultsCarrier, measurement_ymd: YMD, configuration: int, logger: logging.Logger) -> Path:
     """
     Finds the appropriate mask file based on measurement ymd and configuration.
     
@@ -71,7 +71,7 @@ def find_appropriate_mask(defaults: DefaultsCarrier, measurement_ymd: str, confi
             logger.error(f"Error processing file {mask_file}: {e}")
     
     # Find the mask with the nearest `ymd` before or on measurement_ymd
-    measurement_date = datetime.strptime(measurement_ymd, "%Y%m%d")
+    measurement_date = datetime.strptime(measurement_ymd.YMD, "%Y%m%d")
     best_mask = None
     smallest_difference = None
 
@@ -107,6 +107,6 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
         logger.info(f"Completed translator step for {input_file}")
     except Exception as e:
         # Print the standard output and standard error
-        logger.info("Processstep failed with stderr:")
+        logger.info(f"Processstep processstep_add_mask_file failed with stderr:")
         logger.info(e)
         logger.error(f"Error during translator subprocess: {e}")
