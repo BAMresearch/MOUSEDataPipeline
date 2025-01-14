@@ -55,6 +55,8 @@ class DefaultsCarrier:
     projects_dir: Optional[Path] = attrs.field(default=None, converter=convert_to_path_or_none, validator=[if_not_none_is_path_and_exists])
 
     logbook_file: Optional[Path] = attrs.field(default=None, converter=convert_to_path_or_none, validator=[if_not_none_is_path_and_exists])
+    stacker_config_file: Optional[Path] = attrs.field(default=None, converter=convert_to_path_or_none, validator=[if_not_none_is_path_and_exists])
+
     logging_level: str = attrs.field(default='INFO', converter=str)
     log_to_file: bool = attrs.field(default=False)
     log_file: Optional[Path] = attrs.field(default=None, converter=convert_to_path_or_none)
@@ -71,6 +73,7 @@ class DefaultsCarrier:
         self.data_dir = self.data_dir or self.saxs_dir / 'data'
         self.masks_dir = self.masks_dir or self.data_dir / 'Masks'
         self.logbook_file = self.logbook_file or self.saxs_dir / 'logbooks' / 'logbook_MOUSE.xlsx'
+        self.stacker_config_file = self.stacker_config_file or self.data_dir / 'StackerConfigurations' / 'stacker_config.yaml'
         self.projects_dir = self.projects_dir or self.vsi_root / 'Proposals' / 'SAXS002'
 
         self.logger.info("DefaultsCarrier initialized with provided or default paths.")
@@ -114,6 +117,7 @@ def create_defaults_carrier_from_config(config_file: Optional[str] = None) -> De
         data_dir=config.get('data_dir', None),
         masks_dir=config.get('masks_dir', None),
         logbook_file=config.get('logbook_file', None),
+        stacker_config_file=config.get('stacker_config_file', None),
         projects_dir=config.get('projects_dir', None),
         logging_level=config.get('logging_level', 'INFO'),
         log_to_file=config.get('log_to_file', False),
