@@ -2,6 +2,7 @@ from datetime import datetime
 from pathlib import Path
 import subprocess
 
+import HDF5Translator
 import h5py
 from YMD_class import YMD, extract_metadata_from_path
 from defaults_carrier import DefaultsCarrier
@@ -69,7 +70,7 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
             ),
             TranslationElement(
                 # source is none since we're storing derived data
-                destination='/entry1/processing_metadata/background_identifier',
+                destination='/entry1/processing_required_metadata/background_identifier',
                 minimum_dimensionality=1,
                 data_type="string",
                 default_value=f'{entry.bgdate.year}{entry.bgdate.month:02d}{entry.bgdate.day:02d}_{entry.bgnumber}',
@@ -89,7 +90,7 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
         TElements += [
             TranslationElement(
                 # source is none since we're storing derived data
-                destination='/entry1/processing_metadata/dispersant_background_identifier',
+                destination='/entry1/processing_required_metadata/dispersant_background_identifier',
                 minimum_dimensionality=1,
                 data_type="string",
                 default_value=dbg_identifier,
@@ -104,7 +105,7 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
                 data_type="string",
                 default_value=f'{entry.matrixfraction}',
                 attributes={
-                    "note": "Updated by the post-translation processstep_metadata_update."
+                    "note": "The volume fraction that the matrix takes up in the total sample. For dilute samples, this approaches 1.0"
                 },
             ),   
             TranslationElement(
@@ -114,7 +115,7 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
                 data_type="float",
                 default_value=f'{entry.sample.density}',
                 attributes={
-                    "note": "Updated by the post-translation processstep_metadata_update."
+                    "note": "Overall gravimetric density of the sample."
                 },
                 source_units='g/cm^3',
                 destination_units='g/cm^3'
@@ -134,7 +135,7 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
                     "transformation_type": 'translation',
                     "units": 'mm',
                     'vector': [0.0000000, 0.0000000, 1.0000000],
-                    "note": "Updated by the post-translation processstep_metadata_update."
+                    "note": "x offset of the sample, along the beam direction."
                 },
                 source_units='mm',
                 destination_units='mm'
@@ -143,7 +144,7 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
 
 
         update_from_logbook = {
-            '/entry1/experiment/procpipeline': entry.procpipeline,
+            '/entry1/processing_required_metadata/procpipeline': entry.procpipeline,
             '/entry1/experiment/experiment_identifier': entry.proposal,
             '/entry1/experiment/user': entry.user,
             '/entry1/experiment/notes': entry.notes,
@@ -169,12 +170,79 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
                     minimum_dimensionality=1,
                     data_type="string",
                     default_value=value,
-                    attributes={
-                        "note": "Updated by the post-translation processstep_metadata_update."
-                    },
+                    # attributes={
+                    #     "note": "Auto-updated from the logbook by the post-translation processstep_metadata_update."
+                    # },
                 )
             )
 
+        # let's try storing the sample components: 
+        for component in entry.sample.components: # instance of SampleComponent
+            TElements += [
+                TranslationElement(
+                    # source is none since we're storing derived data
+                    destination=f'/entry1/sample/components/{component.component_id}/composition',
+                    data_type="string",
+                    default_value=component.composition,
+                    attributes={
+                        "note": "Atommic composition of the phase in the sample"
+                    },
+                ),
+                TranslationElement(
+                    destination=f'/entry1/sample/components/{component.component_id}/density',
+                    data_type="float",
+                    minimum_dimensionality=1,
+                    default_value=component.density,
+                    attributes={
+                        "units": 'g/cm^3',
+                        "note": "Density of the phase in the sample",
+                    },
+                    source_units='g/cm^3',
+                    destination_units='g/cm^3'
+                ),
+                TranslationElement(
+                    destination=f'/entry1/sample/components/{component.component_id}/mass_fraction',
+                    data_type="float",
+                    minimum_dimensionality=1,
+                    default_value=component.mass_fraction,
+                    attributes={
+                        "note": "Mass fraction of the phase in the sample",
+                    },
+                ),
+                TranslationElement(
+                    destination=f'/entry1/sample/components/{component.component_id}/volume_fraction',
+                    data_type="float",
+                    minimum_dimensionality=1,
+                    default_value=component.volume_fraction,
+                    attributes={
+                        "note": "Volume fraction of the phase in the sample",
+                    },
+                ),
+                TranslationElement(
+                    destination=f'/entry1/sample/components/{component.component_id}/name',
+                    data_type="string",
+                    default_value=component.name,
+                    attributes={
+                        "note": "Name of the phase in the sample",
+                    },
+                ),
+                TranslationElement(
+                    destination=f'/entry1/sample/components/{component.component_id}/connected_to',
+                    data_type="string",
+                    default_value=component.connected_to,
+                    attributes={
+                        "note": "phase connected to this other phase in the sample",
+                    },
+                ),
+                TranslationElement(
+                    destination=f'/entry1/sample/components/{component.component_id}/connection',
+                    data_type="string",
+                    default_value=component.connection,
+                    attributes={
+                        "note": "The way the phase is connected to this other phase in the sample",
+                    },
+                ),
+            ]
 
         # writing the resulting metadata back to the main HDF5 file
         with h5py.File(input_file, "r+") as h5_out:
