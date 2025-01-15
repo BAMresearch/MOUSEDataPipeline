@@ -102,7 +102,7 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
         mask_file = find_appropriate_mask(defaults, ymd, configuration, logger)
         # write result to HDF5 file: 
         with h5py.File(input_file, 'a') as h5f:
-            mask_file_dataset = h5f.require_dataset('/entry1/processing_metadata/mask_file', shape=(), dtype=h5py.special_dtype(vlen=str))
+            mask_file_dataset = h5f.require_dataset('/entry1/processing_required_metadata/mask_file', shape=(), dtype=h5py.special_dtype(vlen=str))
             mask_file_dataset[...] = str(mask_file)
         logger.info(f"Completed translator step for {input_file}")
     except Exception as e:

@@ -8,6 +8,8 @@ from defaults_carrier import DefaultsCarrier
 from logbook2mouse.logbook_reader import Logbook2MouseReader
 import logging
 
+from processstep_add_mask_file import get_configuration
+
 doc = """
 WIP: This special processing step combines all repetitions in a batch. 
 """
@@ -30,16 +32,7 @@ def sort_processed_files_by_instrument_configuration(processed_files: List[Path]
     config_to_files: Dict[str, List[Path]] = {}
 
     for f in processed_files:
-        try:
-            with h5py.File(f, 'r') as h5in:
-                # Retrieve the measurement configuration
-                measurement_config = str(h5in['/entry1/instrument/configuration'][()]) # it's an int... .decode('utf-8') # assuming configuration is stored as bytes
-        except KeyError:
-            logger.info(f"Could not find measurement configuration for {f}")
-            measurement_config = 'unknown'
-        except Exception as e:
-            logger.error(f"Failed to read {f}: {e}")
-            measurement_config = 'unknown'
+        measurement_config = str(get_configuration(f, logger))
         
         # Add the file to the dictionary under the correct key
         if measurement_config not in config_to_files:
@@ -55,7 +48,7 @@ def sort_processed_files_by_instrument_configuration(processed_files: List[Path]
 
 def processing_needed_for_config(dir_path: Path, ymd: YMD, batch: str, config: str, processed_files: List[Path], logger: logging.Logger) -> bool:
     parent_path = dir_path.parent
-    stacked_file = parent_path / f'{ymd.YMD}_{batch}_{config}_stacked.nxs'  # Assuming a naming convention for the stacked file
+    stacked_file = parent_path / f'MOUSE_{ymd.YMD}_{batch}_{config}_stacked.nxs'  # Assuming a naming convention for the stacked file
 
     if not processed_files:
         logger.info(f"No processed files found for batch in {dir_path}, cannot run")
@@ -111,7 +104,7 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
         # did I do this right?
         for config, files in files_by_config.items():
             files_as_str = [str(f) for f in files]
-            stacked_file = parent_path / f'{ymd.YMD}_{batch}_{config}_stacked.nxs'  # Assuming a naming convention for the stacked file
+            stacked_file = parent_path / f'MOUSE_{ymd.YMD}_{batch}_{config}_stacked.nxs'  # Assuming a naming convention for the stacked file
             # output_file = dir_path.parent / 'translated.nxs'
             cmd = [
                 'python3', str(pto_file),
