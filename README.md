@@ -58,6 +58,21 @@ Alternatively, specify measurement details directly:
 python src/directory_processor.py --config MOUSE_settings.yaml --ymd 20250101 --batch 21 --repetition 22 --steps processstep_translator_step_1 processstep_translator_step_2 processstep_beamanalysis
 ```
 
+If you want to do all currently ready steps for all repetitions in a batch, run the following: 
+```zsh
+python src/directory_processor.py --config MOUSE_settings.yaml \
+--ymd 20250101 --batch 21 --parallel --steps \
+processstep_translator_step_1 \
+processstep_translator_step_2 \
+processstep_beamanalysis \
+processstep_cleanup_files \
+processstep_add_mask_file \
+processstep_thickness_from_absorption \
+processstep_metadata_update \
+processstep_add_background_files \
+processstep_stacker
+```
+
 # top-level methods: 
 
 ## 1. `directory_processor`
