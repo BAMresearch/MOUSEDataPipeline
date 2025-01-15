@@ -24,7 +24,7 @@ def can_run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2M
     Checks if the translator step could run.
     """
     ymd, batch, repetition = extract_metadata_from_path(dir_path)
-    step_2_file = dir_path / f'mouse_{ymd}_step_2.nxs'
+    step_2_file = dir_path / f'MOUSE_{ymd}_{batch}_{repetition}.nxs'
     if not step_2_file.is_file():
         logger.info(f"metadata_updater cannot run in {dir_path}, file missing at: {step_2_file}")
         return False
@@ -44,7 +44,7 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
     Updates some metadata fields in the process with a new version of the metadata from the logbook and project/sample information.
     """
     ymd, batch, repetition = extract_metadata_from_path(dir_path)
-    input_file = dir_path / f'mouse_{ymd}_step_2.nxs'
+    input_file = dir_path / f'MOUSE_{ymd}_{batch}_{repetition}.nxs'
     # get the logbook entry for this measurement
     entry = findentry(ymd, batch, logbook_reader)
     if entry is None:

@@ -19,7 +19,7 @@ def can_run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2M
     Checks if the translator step should run.
     """
     ymd, batch, repetition = extract_metadata_from_path(dir_path)
-    step_2_file = dir_path / f'mouse_{ymd}_step_2.nxs'
+    step_2_file = dir_path / f'MOUSE_{ymd}_{batch}_{repetition}.nxs'
     if not step_2_file.is_file():
         logger.info(f"Mask file determination not possible for {dir_path}, file missing at: {step_2_file}")
         return False
@@ -96,7 +96,7 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
     """
     try:
         ymd, batch, repetition = extract_metadata_from_path(dir_path)
-        input_file = dir_path / f'mouse_{ymd}_step_2.nxs'
+        input_file = dir_path / f'MOUSE_{ymd}_{batch}_{repetition}.nxs'
         logger.info(f"Starting mask determination for {input_file}")
         configuration = get_configuration(input_file, logger)
         mask_file = find_appropriate_mask(defaults, ymd, configuration, logger)

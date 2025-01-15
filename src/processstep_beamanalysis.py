@@ -14,7 +14,7 @@ def can_run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2M
     Checks if the translator step should run. We need the translated file. 
     """
     ymd, batch, repetition = extract_metadata_from_path(dir_path)
-    step_2_file = dir_path / f'mouse_{ymd}_step_2.nxs'
+    step_2_file = dir_path / f'MOUSE_{ymd}_{batch}_{repetition}.nxs'
     if not step_2_file.is_file():
         logger.info(f"Beamanalysis not possible for {dir_path}, file missing at: {step_2_file}")
         return False
@@ -33,7 +33,7 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
         # python3 ../../src/tools/post_translation_operation_MOUSE_beamanalysis.py -f 20250101_17_0/testBAM_Dadd.nxs -v -k roi_size=25 image_type="direct_beam"
 
 
-        input_file = dir_path / f'mouse_{ymd}_step_2.nxs'
+        input_file = dir_path / f'MOUSE_{ymd}_{batch}_{repetition}.nxs'
         pto_file = defaults.post_translation_dir / 'post_translation_operation_MOUSE_beamanalysis.py'
         cmd1 = [
             'python3', str(pto_file),

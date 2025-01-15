@@ -21,7 +21,7 @@ def can_run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2M
     Checks if the translator step could run.
     """
     ymd, batch, repetition = extract_metadata_from_path(dir_path)
-    step_2_file = dir_path / f'mouse_{ymd}_step_2.nxs'
+    step_2_file = dir_path / f'MOUSE_{ymd}_{batch}_{repetition}.nxs'
     if not step_2_file.is_file():
         logger.info(f"Beamanalysis not possible for {dir_path}, file missing at: {step_2_file}")
         return False
@@ -83,7 +83,7 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
     Executes the translator processing step.
     """
     ymd, batch, repetition = extract_metadata_from_path(dir_path)
-    input_file = dir_path / f'mouse_{ymd}_step_2.nxs'
+    input_file = dir_path / f'MOUSE_{ymd}_{batch}_{repetition}.nxs'
     try:
         logger.info(f"Starting thickness_from_absorption step for {input_file}")
         absorption_coefficient = get_absorption_coefficient(input_file, logger)

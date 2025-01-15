@@ -31,7 +31,7 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
         # encode: python3 -m HDF5Translator -C BAM_new_MOUSE_xenocs_translator_configuration.yaml -I ./20250101_17_0/im_craw.nxs -O ./20250101_17_0/testBAM.nxs -d
 
         input_file = dir_path / 'im_craw.nxs'
-        output_file = dir_path / f'mouse_{ymd}_step_1.nxs'
+        output_file = dir_path / f'MOUSE_{ymd}_{batch}_{repetition}_step_1.nxs'
         cmd = [
             'python3', '-m', 'HDF5Translator',
             '-C', str(defaults.translator_template_dir / 'BAM_new_MOUSE_xenocs_translator_configuration.yaml'),
