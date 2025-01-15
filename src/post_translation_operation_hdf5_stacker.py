@@ -33,7 +33,7 @@ class newNewConcat(object):
 
     def __init__(self, outputFile:Path = None, filenames:list = [], stackItems:list = []):
         assert isinstance(outputFile, Path), 'output filename must be a path instance'
-        assert len(filenames) > 2, 'at least two files are required for stacking.'
+        assert len(filenames) > 0, 'at least one file is required for stacking.'
         # assert that the filenames to stack all exist:
         for fname in filenames:
             assert fname.exists(), f'filename {fname} does not exist in the list of files to stack.'
@@ -116,7 +116,7 @@ def main(
     """
     # Process input parameters:
     # Make sure we have at least two files to stack, something argparse cannot do
-    assert len(auxiliary_files) >= 2, "At least two files are required for stacking."
+    assert len(auxiliary_files) >= 1, "At least one file is required for stacking."
 
     # read the stacking section of the configuration file, which contains two sections: which datasets to stack and which to calculate the average and standard deviation over:
     with open(config, "r") as f:

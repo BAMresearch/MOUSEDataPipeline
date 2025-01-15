@@ -91,7 +91,7 @@ class DirectoryProcessor:
         Returns the list of Path objects for all repetition directories in a batch.
         """
         base_dir = self.defaults.data_dir / ymd.get_year() / str(ymd)
-        return list(base_dir.glob(f"{ymd}_{batch}_*"))
+        return list(base_dir.glob(f"{ymd}_{batch}_*/"))
 
     def _resolve_directory(
         self, 
