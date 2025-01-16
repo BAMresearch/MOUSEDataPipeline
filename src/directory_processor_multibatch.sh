@@ -22,8 +22,8 @@ for ((batch=MIN_BATCH; batch<=MAX_BATCH; batch++)); do
     processstep_beamanalysis \
     processstep_cleanup_files \
     processstep_add_mask_file \
-    processstep_thickness_from_absorption \
     processstep_metadata_update \
+    processstep_thickness_from_absorption \
     processstep_add_background_files \
     processstep_stacker
 
