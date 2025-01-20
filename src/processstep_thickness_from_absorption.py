@@ -77,6 +77,18 @@ def calculate_thickness(absorption_coefficient: float, absorption: float, logger
     thickness = -1 * np.log10(absorption) / absorption_coefficient
     return thickness
 
+def get_background_file(filename: Path, logger: logging.Logger) -> Path:
+    """
+    Returns the background file for a given sample.
+    """
+    with h5py.File(filename, 'r') as h5f:
+        if '/entry1/processing_required_metadata/background_file' in h5f:
+            background_file = h5f['/entry1/processing_required_metadata/background_file'][()].decode('utf-8')
+    
+    if Path(background_file).is_file():
+        return Path(background_file)
+    else:
+        return None
 
 def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2MouseReader, logger: logging.Logger):
     """
@@ -88,6 +100,19 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
         logger.info(f"Starting thickness_from_absorption step for {input_file}")
         absorption_coefficient = get_absorption_coefficient(input_file, logger)
         absorption = get_absorption(input_file, logger)
+        # we also need to get the absorption from the background file if it exists: 
+        background_file = get_background_file(input_file, logger)
+        if background_file:
+            if input_file.stem[:-4] == background_file.stem[:-4]:
+                logger.warning(f"Sample and background file are the same: {input_file} and {background_file}")
+                logger.warning(f"Not correcting for background transmission")
+            else:
+                absorption_bg = get_absorption(background_file, logger)
+                absorption_sample = 1-(1-absorption)/(1-absorption_bg)
+                if 0 < absorption_sample < 1:
+                    logger.warning(f"Sample-specific absorption {absorption_sample} outside of realistic limits. total absorption: {absorption}, background absorption: {absorption_bg}. resetting to {absorption}")
+                else:
+                    absorption = absorption_sample
         thickness = calculate_thickness(absorption_coefficient, absorption, logger)
         with h5py.File(input_file, 'a') as h5f:
             # this will be stacked into a list of thicknesses... 
