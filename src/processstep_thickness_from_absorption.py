@@ -120,7 +120,7 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
             tloc[...] = thickness
             tloc.attrs['units'] = 'm'
 
-        logger.info(f"Completed thickness_from_absorption step for {input_file}, {absorption_bg=}. {absorption=}, {absorption_sample=}, {absorption_coefficient=}, {thickness=}")
+        logger.info(f"Completed thickness_from_absorption step for {input_file}, {absorption=}, {absorption_bg=}. {absorption_sample=}, {absorption_coefficient=}, {thickness=}")
     except Exception as e:
         # Print the standard output and standard error
         logger.info("thickness_from_absorption step failed with error:")
