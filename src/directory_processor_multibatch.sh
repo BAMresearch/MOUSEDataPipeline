@@ -23,8 +23,8 @@ for ((batch=MIN_BATCH; batch<=MAX_BATCH; batch++)); do
     processstep_cleanup_files \
     processstep_add_mask_file \
     processstep_metadata_update \
-    processstep_thickness_from_absorption \
     processstep_add_background_files \
+    processstep_thickness_from_absorption \
     processstep_stacker
 
     # Check if the last command was successful
