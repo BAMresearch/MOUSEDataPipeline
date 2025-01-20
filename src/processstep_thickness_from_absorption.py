@@ -102,6 +102,8 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
         absorption = get_absorption(input_file, logger)
         # we also need to get the absorption from the background file if it exists: 
         background_file = get_background_file(input_file, logger)
+        absorption_bg = 0
+        absorption_sample = absorption
         if background_file:
             if input_file.stem[:-4] == background_file.stem[:-4]:
                 logger.warning(f"Sample and background file are the same: {input_file} and {background_file}")
@@ -111,16 +113,14 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
                 absorption_sample = 1-(1-absorption)/(1-absorption_bg)
                 if 0 < absorption_sample < 1:
                     logger.warning(f"Sample-specific absorption {absorption_sample} outside of realistic limits. total absorption: {absorption}, background absorption: {absorption_bg}. resetting to {absorption}")
-                else:
-                    absorption = absorption_sample
-        thickness = calculate_thickness(absorption_coefficient, absorption, logger)
+        thickness = calculate_thickness(absorption_coefficient, absorption_sample, logger)
         with h5py.File(input_file, 'a') as h5f:
             # this will be stacked into a list of thicknesses... 
             tloc = h5f.require_dataset('/entry1/sample/absorptionDerivedThicknesses', shape=(), dtype=np.float32)
             tloc[...] = thickness
             tloc.attrs['units'] = 'm'
 
-        logger.info(f"Completed thickness_from_absorption step for {input_file}")
+        logger.info(f"Completed thickness_from_absorption step for {input_file}, {absorption_bg=}. {absorption=}, {absorption_sample=}, {absorption_coefficient=}, {thickness=}")
     except Exception as e:
         # Print the standard output and standard error
         logger.info("thickness_from_absorption step failed with error:")
