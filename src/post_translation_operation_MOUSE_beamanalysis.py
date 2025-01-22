@@ -52,10 +52,10 @@ the option of supplying key-value pairs for additional parameters to your operat
 You can replace the calculation and file read/write logic according to your specific requirements.
 """
 
-def hdf5_get_image(filename: Path, h5imagepath: str = "entry/data/data") -> np.ndarray:
-    with h5py.File(filename, "r") as h5f:
-        image = h5f[h5imagepath][()]
-    return image
+# def hdf5_get_image(filename: Path, h5imagepath: str = "entry/data/data") -> np.ndarray:
+#     with h5py.File(filename, "r") as h5f:
+#         image = h5f[h5imagepath][()]
+#     return image
 
 def reduce_extra_image_dimensions(image:np.ndarray, method=np.mean)->np.ndarray:
     assert method in [np.mean, np.sum], "method must be either np.mean or np.sum function handles"
@@ -74,15 +74,14 @@ def beam_analysis(imageData: np.ndarray, ROI_SIZE: int) -> Union[tuple, float]:
     threshold_value = np.maximum(
         1, 0.0001 * maskedTwoDImage.max()
     )  # filters.threshold_otsu(maskedTwoDImage) # ignore zero pixels
+    print(f'{threshold_value=}')
     labeled_peak = (maskedTwoDImage > threshold_value).astype(int)  # label peak
     properties = regionprops(labeled_peak, imageData)  # calculate region properties
     if len(properties) == 0:  # no beam found
         return (0,0), 0
     # continue normally if beam found
     center_of_mass = properties[0].centroid  # center of mass (unweighted by intensity)
-    weighted_center_of_mass = properties[
-        0
-    ].weighted_centroid  # center of mass (weighted)
+    weighted_center_of_mass = properties[0].weighted_centroid  # center of mass (weighted)
     # determine the total intensity in the region of interest, this will be later divided by measuremet time to get the flux
     ITotal_region = np.sum(
         maskedTwoDImage[
@@ -98,7 +97,7 @@ def beam_analysis(imageData: np.ndarray, ROI_SIZE: int) -> Union[tuple, float]:
     logging.debug(f"{center_of_mass=}")
     logging.debug(f"{ITotal_region=} counts")
 
-    return center_of_mass, ITotal_region
+    return weighted_center_of_mass, ITotal_region
 
 
 # If you are adjusting the template for your needs, you probably only need to touch the main function:
@@ -165,8 +164,8 @@ def main(
         # Read necessary information (this is just a placeholder, adapt as needed)
         imageData = h5_in[BeamDatapath][()]
         # mean because count_time is the frame time minus the readout time. 
-        imageData = reduce_extra_image_dimensions(imageData, method=np.mean)
         recordingTime = h5_in[BeamDurationPath][()]
+    imageData = reduce_extra_image_dimensions(imageData, method=np.mean)
 
     # Now you can do operations, such as determining a beam center and flux. For that, we need to
     # do a few steps...

@@ -7,6 +7,8 @@ from YMD_class import extract_metadata_from_path
 from defaults_carrier import DefaultsCarrier
 from logbook2mouse.logbook_reader import Logbook2MouseReader
 import logging
+from HDF5Translator.translator_elements import TranslationElement
+from HDF5Translator.translator import process_translation_element
 
 doc = """
 This processing step updates the metadata with the estimated thickness from the 
@@ -114,11 +116,52 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
                 if 0 < absorption_sample < 1:
                     logger.warning(f"Sample-specific absorption {absorption_sample} outside of realistic limits. total absorption: {absorption}, background absorption: {absorption_bg}. resetting to {absorption}")
         thickness = calculate_thickness(absorption_coefficient, absorption_sample, logger)
-        with h5py.File(input_file, 'a') as h5f:
-            # this will be stacked into a list of thicknesses... 
-            tloc = h5f.require_dataset('/entry1/sample/absorptionDerivedThicknesses', shape=(), dtype=np.float32)
-            tloc[...] = thickness
-            tloc.attrs['units'] = 'm'
+
+                # This class lets you configure exactly what the output should look like in the HDF5 file.
+        TElements = []  # we want to add two elements, so I make a list
+        TElements += [
+            TranslationElement(
+                # source is none since we're storing derived data
+                destination="/entry1/sample/absorptionDerivedThicknesses",
+                minimum_dimensionality=1,
+                data_type="float32",
+                default_value=thickness,
+                source_units="m",
+                destination_units="m",
+                attributes={
+                    "note": "Determined by the processstep_thickness_from_absorption post-translation processing script."
+                },
+            ),
+            TranslationElement(
+                # source is none since we're storing derived data
+                destination="/entry1/sample/absorption_by_sample",
+                minimum_dimensionality=1,
+                data_type="float32",
+                default_value=absorption_sample,
+                source_units="",
+                destination_units="",
+                attributes={
+                    "note": "Determined by the processstep_thickness_from_absorption post-translation processing script."
+                },
+            ),
+            TranslationElement(
+                # source is none since we're storing derived data
+                destination="/entry1/sample/absorption_by_bg",
+                minimum_dimensionality=1,
+                data_type="float32",
+                default_value=absorption_bg,
+                source_units="",
+                destination_units="",
+                attributes={
+                    "note": "Determined by the processstep_thickness_from_absorption post-translation processing script."
+                },
+            ),
+        ]
+
+        # writing the resulting metadata back to the main HDF5 file
+        with h5py.File(input_file, "r+") as h5_out:
+            for element in TElements:  # iterate over the two elements and write them back
+                process_translation_element(None, h5_out, element)
 
         logger.info(f"Completed thickness_from_absorption step for {input_file}, {absorption=}, {absorption_bg=}. {absorption_sample=}, {absorption_coefficient=}, {thickness=}")
     except Exception as e:
