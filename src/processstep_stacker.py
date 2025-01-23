@@ -110,7 +110,7 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
                 'python3', str(pto_file),
                 '-c', str(defaults.stacker_config_file),
                 '-o', str(stacked_file),
-                '-v', 
+                # '-v', 
                 # '-l',
                 '-a', *files_as_str, # <-- processed files go here
             ]

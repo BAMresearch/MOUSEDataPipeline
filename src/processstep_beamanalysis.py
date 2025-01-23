@@ -38,13 +38,13 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
         cmd1 = [
             'python3', str(pto_file),
             '-f', str(input_file),
-            '-v', 
+            # '-v', 
             '-k', 'roi_size=25', 'image_type=sample_beam',
         ]
         cmd2 = [
             'python3', str(pto_file),
             '-f', str(input_file),
-            '-v', 
+            # '-v', 
             '-k', 'roi_size=25', 'image_type=direct_beam',
         ]
 

@@ -78,7 +78,7 @@ class DirectoryProcessor:
                     self._run_processing_step(step_name, directory, ymd, batch, None)
 
     def _run_steps_in_parallel(self, step_name: str, directories: List[Path], ymd: YMD, batch: int):
-        print('running in parallel...')
+        # ('running in parallel...')
         with concurrent.futures.ThreadPoolExecutor() as executor:
             futures = [
                 executor.submit(self._run_processing_step, step_name, directory, ymd, batch, None)

@@ -30,7 +30,7 @@ for ((batch=MIN_BATCH; batch<=MAX_BATCH; batch++)); do
     # Check if the last command was successful
     if [ $? -ne 0 ]; then
         echo "Failed to process batch $batch. Exiting."
-        exit 1
+        # exit 1
     fi
 
     echo "Completed batch $batch"
