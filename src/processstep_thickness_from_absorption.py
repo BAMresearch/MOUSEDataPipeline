@@ -134,6 +134,18 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
             ),
             TranslationElement(
                 # source is none since we're storing derived data
+                destination="/entry1/sample/absorption_total",
+                minimum_dimensionality=1,
+                data_type="float32",
+                default_value=absorption,
+                source_units="",
+                destination_units="",
+                attributes={
+                    "note": "Determined by the processstep_thickness_from_absorption post-translation processing script."
+                },
+            ),
+            TranslationElement(
+                # source is none since we're storing derived data
                 destination="/entry1/sample/absorption_by_sample",
                 minimum_dimensionality=1,
                 data_type="float32",
