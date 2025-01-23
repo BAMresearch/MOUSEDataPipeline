@@ -85,17 +85,19 @@ class newNewConcat(object):
         assert isinstance(outputFile, Path), 'output filename must be a path instance'
         assert len(filenames) > 0, 'at least one file is required for stacking.'
         # assert that the filenames to stack all exist:
+        okFilenames = filenames.copy()
         for fname in filenames:
             # if the file does not pass the canStack test, remove it from the list:
             if not canStack(fname):
-                filenames.remove(fname)
+                okFilenames.remove(fname)
                 logging.warning(f'file {fname} does not pass the canStack test, removing from list of files to stack.')
                 # save the file in an error list text file:
                 with open(outputFile.with_suffix('.stacking_error_list'), 'a') as f:
                     f.write(f'{fname}\n')
             assert fname.exists(), f'filename {fname} does not exist in the list of files to stack.'
-        assert len(filenames) > 0, 'after checking, not enough valid files for stacking.'
- 
+        assert len(okFilenames) > 0, 'after checking, not enough valid files for stacking.'
+        # store the filenames that passed the canStack test:
+        filenames = okFilenames
         # store in the class
         self.outputFile = outputFile
         self.stackItems = stackItems
