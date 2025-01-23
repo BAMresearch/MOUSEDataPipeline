@@ -113,7 +113,7 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
             else:
                 absorption_bg = get_absorption(background_file, logger)
                 absorption_sample = 1-(1-absorption)/(1-absorption_bg)
-                if 0 < absorption_sample < 1:
+                if not(0 < absorption_sample < 1):
                     logger.warning(f"Sample-specific absorption {absorption_sample} outside of realistic limits. total absorption: {absorption}, background absorption: {absorption_bg}. resetting to {absorption}")
         thickness = calculate_thickness(absorption_coefficient, absorption_sample, logger)
 

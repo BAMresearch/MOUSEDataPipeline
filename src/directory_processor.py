@@ -25,6 +25,8 @@ class DirectoryProcessor:
         Post-initialization setup.
         """
         self.logger = self.defaults.logger
+        # set logger level by default to warning:
+        self.logger.setLevel(logging.WARNING)
         self.logger.debug(f"Initializing {self.__class__.__name__}...")
         self.logbook_reader = Logbook2MouseReader(
             self.defaults.logbook_file, 
