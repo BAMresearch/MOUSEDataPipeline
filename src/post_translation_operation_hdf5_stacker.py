@@ -36,13 +36,13 @@ def canStack(filename:Path)->bool:
     """
     # checklist for a few key critical items to ensure we've preprocessed correctly:
     checkList = [
-        "entry1/experiment/environment_temperature",
-        "entry1/experiment/stage_temperature",
+        # "entry1/experiment/environment_temperature",
+        # "entry1/experiment/stage_temperature",
         "entry1/instrument/detector00/data", # assure primary data is there
 
         "entry1/sample/beam/flux", # beam analysis has been done
         "entry1/sample/beam/incident_wavelength",
-        "entry1/sample/thickness", # thickness calculation has been entered from the beam analysis
+        # "entry1/sample/thickness", # thickness calculation has been entered from the beam analysis
         "entry1/sample/transmission", # beam analysis with both beams is there
 
         "entry1/processing/direct_beam_profile/beam_analysis/centerOfMass",        
@@ -59,12 +59,15 @@ def canStack(filename:Path)->bool:
         try:
             for path in checkList:
                 if not path in h5f:
+                    logging.warning(f'path not found: {path} in file {filename}')
                     return False
 
             for path in checkFileExistence:
                 if not path in h5f:
+                    logging.warning(f'path not found: {path} in file {filename}')
                     return False
                 if not Path(h5f[path][()].decode('utf-8')).is_file():
+                    logging.warning(f'file {h5f[path][()].decode('utf-8')} not found at: {path} in file {filename}')
                     return False
 
         except Exception as e:
@@ -119,23 +122,23 @@ class newNewConcat(object):
             # using h5py.visititems to walk the file
 
             def printLinkItem(name, obj):
-                print(f'Link item found: {name= }, {obj= }')
+                logging.debug(f'Link item found: {name= }, {obj= }')
 
             def addItem(name, obj):
                 if name == 'entry1/sample/beam/incident_wavelength':
-                    print(f'found the path: {name}')                
+                    logging.debug(f'found the path: {name}')                
                 if isinstance(obj, h5py.Group):
-                    print(f'adding group: {name}')
+                    logging.debug(f'adding group: {name}')
                     h5out.create_group(name)
                     # add attributes
                     h5out[name].attrs.update(obj.attrs)
                 elif isinstance(obj, h5py.Dataset) and not (name in self.stackItems):
-                    print(f'plainly adding dataset: {name}')
+                    logging.debug(f'plainly adding dataset: {name}')
                     h5in.copy(name, h5out, expand_external=True, name=name)
                     h5out[name].attrs.update(obj.attrs)
                     # h5out.create_dataset(name, data=obj[()])
                 elif isinstance(obj, h5py.Dataset) and name in self.stackItems:
-                    print(f'preparing by initializing the stacked dataset: {name} to shape {(*addShape, *obj.shape)}')
+                    logging.debug(f'preparing by initializing the stacked dataset: {name} to shape {(*addShape, *obj.shape)}')
                     h5out.create_dataset(
                         name,
                         shape = (*addShape, *obj.shape),
@@ -146,7 +149,7 @@ class newNewConcat(object):
                     )
                     h5out[name].attrs.update(obj.attrs)
                 else:
-                    print(f'** uncaught object: {name}')
+                    logging.info(f'** uncaught object: {name}')
             
             h5in.visititems(addItem)
             h5in.visititems_links(printLinkItem)
@@ -155,14 +158,14 @@ class newNewConcat(object):
         with h5py.File(ifname, 'r') as h5in, h5py.File(self.outputFile, 'a') as h5out:
             for path in self.stackItems:
                 if path in h5in and path in h5out:
-                    print(f'adding data to stack: {path} at stackLocation: {addAtStackLocation}')
+                    logging.debug(f'adding data to stack: {path} at stackLocation: {addAtStackLocation}')
                     h5out[path][addAtStackLocation] = h5in[path][()]            
                 elif not path in h5in:
-                    print(f'** could not find path {path} in input file,. skipping...')
+                    logging.warning(f'** could not find path {path} in input file,. skipping...')
                 elif not path in h5out:
-                    print(f'** could not find path {path} in output file, skipping...')
+                    logging.warning(f'** could not find path {path} in output file, skipping...')
                 else:
-                    print(f'** uncaught error with path {path}, skipping...')
+                    logging.warning(f'** uncaught error with path {path}, skipping...')
 
 
 # If you are adjusting the template for your needs, you probably only need to touch the main function:
