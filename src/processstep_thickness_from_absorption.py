@@ -122,7 +122,7 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
         TElements += [
             TranslationElement(
                 # source is none since we're storing derived data
-                destination="/entry1/sample/absorptionDerivedThicknesses",
+                destination="/entry1/sample/absorptionDerivedThickness",
                 minimum_dimensionality=1,
                 data_type="float32",
                 default_value=thickness,
