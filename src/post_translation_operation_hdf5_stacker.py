@@ -22,6 +22,56 @@ from HDF5Translator.utils.validators import (
 )
 from HDF5Translator.utils.configure_logging import configure_logging
 
+def canStack(filename:Path)->bool:
+    """
+    Check if a file can be stacked.
+    Parameters
+    ----------
+    filename : Path
+        The path of the file to check.
+    Returns
+    -------
+    bool 
+        True if the file can be stacked.
+    """
+    # checklist for a few key critical items to ensure we've preprocessed correctly:
+    checkList = [
+        "entry1/experiment/environment_temperature",
+        "entry1/experiment/stage_temperature",
+        "entry1/instrument/detector00/data", # assure primary data is there
+
+        "entry1/sample/beam/flux", # beam analysis has been done
+        "entry1/sample/beam/incident_wavelength",
+        "entry1/sample/thickness", # thickness calculation has been entered from the beam analysis
+        "entry1/sample/transmission", # beam analysis with both beams is there
+
+        "entry1/processing/direct_beam_profile/beam_analysis/centerOfMass",        
+        "entry1/processing/sample_beam_profile/beam_analysis/centerOfMass",        
+    ]
+    # check that the filenames referenced in these paths exist:
+    checkFileExistence = [
+        # background file cannot be checked at this stage as it might not exist yet. :(
+        # "entry1/processing_required_metadata/background_file", 
+        "entry1/processing_required_metadata/mask_file", 
+    ]
+
+    with h5py.File(filename, 'r') as h5f:
+        try:
+            for path in checkList:
+                if not path in h5f:
+                    return False
+
+            for path in checkFileExistence:
+                if not path in h5f:
+                    return False
+                if not Path(h5f[path][()].decode('utf-8')).is_file():
+                    return False
+
+        except Exception as e:
+            return False
+
+    return True
+
 class newNewConcat(object):
     """
     Similar in structure to newConcat, but using h5py instead of nexusformat.nx
@@ -36,8 +86,16 @@ class newNewConcat(object):
         assert len(filenames) > 0, 'at least one file is required for stacking.'
         # assert that the filenames to stack all exist:
         for fname in filenames:
+            # if the file does not pass the canStack test, remove it from the list:
+            if not canStack(fname):
+                filenames.remove(fname)
+                logging.warning(f'file {fname} does not pass the canStack test, removing from list of files to stack.')
+                # save the file in an error list text file:
+                with open(outputFile.with_suffix('.stacking_error_list'), 'a') as f:
+                    f.write(f'{fname}\n')
             assert fname.exists(), f'filename {fname} does not exist in the list of files to stack.'
-
+        assert len(filenames) > 0, 'after checking, not enough valid files for stacking.'
+ 
         # store in the class
         self.outputFile = outputFile
         self.stackItems = stackItems
