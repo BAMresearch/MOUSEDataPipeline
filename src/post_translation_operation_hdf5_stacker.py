@@ -12,6 +12,7 @@ Usage:
 
 import argparse
 import h5py
+import numpy as np
 import yaml
 import logging
 from pathlib import Path
@@ -84,7 +85,7 @@ class newNewConcat(object):
     core = None
     stackItems = None
 
-    def __init__(self, outputFile:Path = None, filenames:list = [], stackItems:list = []):
+    def __init__(self, outputFile:Path = None, filenames:list = [], stackItems:list = [], calculate_average:list = []):
         assert isinstance(outputFile, Path), 'output filename must be a path instance'
         assert len(filenames) > 0, 'at least one file is required for stacking.'
         # assert that the filenames to stack all exist:
@@ -112,8 +113,32 @@ class newNewConcat(object):
 
         # add the datasets to the file.. this could perhaps be done in parallel
         for idx, filename in enumerate(filenames): 
+            print(f'adding file {idx+1} of {len(filenames)}: {filename}')
             self.addDataToStack(filename, addAtStackLocation = idx)
 
+        # now we calculate the mean, std and standard error on the mean of selected datasets:
+        for path in calculate_average:
+            self.calculateAverage(path)
+    
+    def calculateAverage(self, path):
+        with h5py.File(self.outputFile, 'a') as h5out:
+            if path in h5out:
+                logging.debug(f'calculating average for path: {path}')
+                data = h5out[path][()]
+                # assure data is an array with dtype float
+                data = np.array(data, dtype=float)
+                attributes = h5out[path].attrs
+                mean = data.mean()
+                std = data.std(ddof=1)
+                sem = std / np.sqrt(np.size(data))
+                ds = h5out.create_dataset(f'{path}_mean', data=mean)
+                ds.attrs.update(attributes)
+                ds = h5out.create_dataset(f'{path}_std', data=std)
+                ds.attrs.update(attributes)
+                ds = h5out.create_dataset(f'{path}_sem', data=sem)
+                ds.attrs.update(attributes)
+            else:
+                logging.warning(f'path {path} not found in output file, skipping average calculation')
 
     def createStructureFromFile(self, ifname, addShape):
         """addShape is a tuple with the dimensions to add to the normal datasets. i.e. (280, 1) will add those dimensions to the array shape"""
@@ -139,12 +164,16 @@ class newNewConcat(object):
                     # h5out.create_dataset(name, data=obj[()])
                 elif isinstance(obj, h5py.Dataset) and name in self.stackItems:
                     logging.debug(f'preparing by initializing the stacked dataset: {name} to shape {(*addShape, *obj.shape)}')
+                    totalShape = (*addShape, *obj.shape)
+                    chunkShape = list(totalShape)
+                    chunkShape[0] = 1
                     h5out.create_dataset(
                         name,
-                        shape = (*addShape, *obj.shape),
-                        maxshape = (*addShape, *obj.shape),
+                        shape = totalShape,
+                        chunks = tuple(chunkShape),
+                        maxshape = totalShape,
                         dtype = obj.dtype,
-                        compression="gzip",
+                        compression="gzip", # if we switch on gzip compression, this operation becomes very slow
                         # data = obj[()]
                     )
                     h5out[name].attrs.update(obj.attrs)
@@ -185,12 +214,11 @@ def main(
     with open(config, "r") as f:
         config = yaml.safe_load(f)
         stack_datasets = config.get("stack_datasets", None)
-        # calculate_average = config.get("calculate_average", None)
-        
+        calculate_average = config.get("calculate_average", None)
     # at least the stack_datasets dictionary must exist: 
     assert stack_datasets is not None, "The configuration file must contain a 'stack_datasets' section."
     # Stack the datasets
-    newNewConcat(output, auxiliary_files, stack_datasets)
+    newNewConcat(output, auxiliary_files, stack_datasets, calculate_average)
 
     logging.info("Post-translation processing complete.")
 
