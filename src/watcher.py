@@ -4,57 +4,53 @@ import argparse
 from pathlib import Path
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler, FileSystemEvent
-import attrs
 import logging
+import time
+
+from YMD_class import extract_metadata_from_path
+from directory_processor import DirectoryProcessor
+from defaults_carrier import DefaultsCarrier, load_config_from_yaml
+from checkers import processing_possible, already_processed
 
 logging.basicConfig(level=logging.INFO)
 
-@attrs.define
-class DirectoryProcessor(FileSystemEventHandler):
-    """
-    File Watcher and Processor for HDF5 Translation
 
-    This script uses the `watchdog` library to monitor a directory tree for new
-    directories and processes files within those directories. It specifically checks
-    for the presence of the `im_craw.nxs` file and ensures that a translation
-    process is executed if the `translated.nxs` file does not yet exist. It is designed
-    to handle multi-step processing pipelines for HDF5 translation.
-
-    Features:
-    - Watches for new directories in a specified directory tree.
-    - Triggers processing for directories containing all necessary source files.
-    - Utilizes `subprocess` to execute translation commands.
-
-    Prerequisites:
-    - `watchdog` library: Install using `pip install watchdog`.
-
-    Functions:
-    - process_directory(dir_path): Checks if translations are required and executes them.
-    - on_created(event): Responds to new directory creation and starts processing as needed.
-
-    Usage:
-    - Define the `processing_dirs` path with the top-level directory to be monitored.
-    - Extend `process_directory` to add further processing steps after initial translation.
-    - Adjust `subprocess.run` commands for specific translation tool invocation.
-
-    Notes:
-    - The script runs indefinitely until interrupted (e.g., by a keyboard interruption).
-    - Handles basic setup for watching directory events and processing them.
-    - Expand the translation logic and path handling as per your data and requirements.
-
-    """
-    processing_directories: Path = attrs.field(converter=Path, validator=[attrs.validators.instance_of(Path)])
-
-
-    def __attrs_post_init__(self):
-        assert self.processing_directories.is_dir(), "The specified directory to watch does not exist."
-
-
-
+class WatcherFileSystemEventHandler(FileSystemEventHandler):
+    def __init__(self, processor: DirectoryProcessor, logger: logging.Logger):
+        self.processor = processor
+        self.logger = logger
 
     def on_created(self, event: FileSystemEvent):
         if event.is_directory:
-            self.process_directory(Path(event.src_path))
+            self.logger.info(f"New directory detected: {event.src_path}")
+            dir_path = Path(event.src_path)
+            
+            if already_processed(dir_path):
+                self.logger.info(f"Directory already processed: {dir_path}")
+                return
+
+            # Wait for files to stabilize
+            timeout = 600  # 10 minutes
+            stability_check_interval = 10
+
+            start_time = time.time()
+            while time.time() - start_time < timeout:
+                if processing_possible(dir_path):
+                    self.logger.info(f"Processing possible for {dir_path}")
+                    ymd, batch, repetition = extract_metadata_from_path(dir_path)
+                    self.processor.process_directory(
+                        single_dir=dir_path,
+                        ymd=ymd,
+                        batch=batch,
+                        repetition=repetition
+                    )
+                    return
+                else:
+                    self.logger.info(f"Waiting for directory to stabilize: {dir_path}")
+                    time.sleep(stability_check_interval)
+
+            self.logger.warning(f"Timed out waiting for stabilization of directory: {dir_path}")
+
 
 def main():
     parser = argparse.ArgumentParser(description="Watch a directory tree for changes and process new directories.")
@@ -62,15 +58,38 @@ def main():
         "input_path",
         help="The top-level directory path to monitor."
     )
+    parser.add_argument('--config', type=str, required=True, help="Path to the configuration yaml file.")
+
     args = parser.parse_args()
-    event_handler = DirectoryProcessor(args.input_path)
+
+    config = load_config_from_yaml(args.config)
+    defaults = DefaultsCarrier(**config)
+    logger = logging.getLogger(__name__)
+
+    steps = [
+        'processstep_translator_step_1',
+        'processstep_translator_step_2',
+        'processstep_beamanalysis',
+        'processstep_cleanup_files',
+        'processstep_add_mask_file',
+        'processstep_metadata_update',
+        'processstep_add_background_files',
+        'processstep_thickness_from_absorption',
+        'processstep_transmission_thickness_flux_table',
+        'processstep_stacker'
+    ]
+
+    processor = DirectoryProcessor(defaults=defaults, steps=steps)
+
+    event_handler = WatcherFileSystemEventHandler(processor=processor, logger=logger)
     observer = Observer()
     observer.schedule(event_handler, path=args.input_path, recursive=True)
 
     try:
         observer.start()
+        logger.info(f"Started watching directory: {args.input_path}")
         while True:
-            pass
+            time.sleep(1)
     except KeyboardInterrupt:
         observer.stop()
     observer.join()
