@@ -16,14 +16,20 @@ logging.basicConfig(level=logging.INFO)
 
 
 class WatcherFileSystemEventHandler(FileSystemEventHandler):
-    def __init__(self, processor: DirectoryProcessor, logger: logging.Logger):
+    def __init__(self, processor: DirectoryProcessor, logger: logging.Logger, base_path: Path, max_depth: int):
         self.processor = processor
         self.logger = logger
+        self.base_path = base_path.resolve()
+        self.max_depth = max_depth
 
     def on_created(self, event: FileSystemEvent):
         if event.is_directory:
             self.logger.info(f"New directory detected: {event.src_path}")
             dir_path = Path(event.src_path)
+            depth = len(dir_path.relative_to(self.base_path).parts)
+            if depth > self.max_depth:
+                self.logger.info(f"Skipping subdirectory: {dir_path}")
+                return
             
             if already_processed(dir_path):
                 self.logger.info(f"Directory already processed: {dir_path}")
@@ -35,6 +41,9 @@ class WatcherFileSystemEventHandler(FileSystemEventHandler):
 
             start_time = time.time()
             while time.time() - start_time < timeout:
+                if already_processed(dir_path):
+                    self.logger.info(f"Directory already processed: {dir_path}")
+                    return
                 if processing_possible(dir_path):
                     self.logger.info(f"Processing possible for {dir_path}")
                     ymd, batch, repetition = extract_metadata_from_path(dir_path)
@@ -76,12 +85,12 @@ def main():
         'processstep_add_background_files',
         'processstep_thickness_from_absorption',
         'processstep_transmission_thickness_flux_table',
-        'processstep_stacker'
+        # 'processstep_stacker'
     ]
 
     processor = DirectoryProcessor(defaults=defaults, steps=steps)
 
-    event_handler = WatcherFileSystemEventHandler(processor=processor, logger=logger)
+    event_handler = WatcherFileSystemEventHandler(processor=processor, logger=logger, base_path=Path(args.input_path), max_depth=1)
     observer = Observer()
     observer.schedule(event_handler, path=args.input_path, recursive=True)
 

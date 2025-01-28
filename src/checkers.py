@@ -6,8 +6,11 @@ def already_processed(dir_path: Path) -> bool:
     """
     This method checks if the directory has already been processed. 
     """
-    translated_path = dir_path / 'translated.nxs'
-    return translated_path.is_file()
+    translated_pathlist = list(dir_path.glob('MOUSE_*_*_*.nxs'))
+    if len(translated_pathlist) == 0:
+        return False
+    else:
+        return translated_pathlist[0].is_file()
 
 def len_files_in_path(dir_path: Path, globstring:str = '*') -> int:
     return len(list(dir_path.glob(globstring)))
