@@ -181,3 +181,4 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
         logger.info("thickness_from_absorption step failed with error:")
         logger.info(e)
         logger.error(f"Error during thickness_from_absorption step: {e}")
+

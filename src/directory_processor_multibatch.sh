@@ -25,6 +25,7 @@ for ((batch=MIN_BATCH; batch<=MAX_BATCH; batch++)); do
     processstep_metadata_update \
     processstep_add_background_files \
     processstep_thickness_from_absorption \
+    processstep_transmission_thickness_flux_table \
     processstep_stacker
 
     # Check if the last command was successful
