@@ -36,7 +36,7 @@ class WatcherFileSystemEventHandler(FileSystemEventHandler):
                 return
 
             # Wait for files to stabilize
-            timeout = 600  # 10 minutes
+            timeout = 660  # 11 minutes
             stability_check_interval = 10
 
             start_time = time.time()
