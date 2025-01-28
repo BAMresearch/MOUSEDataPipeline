@@ -61,9 +61,20 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
         # write result to HDF5 file: 
         with h5py.File(input_file, 'a') as h5f:
             bg_file_dataset = h5f.require_dataset('/entry1/processing_required_metadata/background_file', shape=(), dtype=h5py.special_dtype(vlen=str))
-            bg_file_dataset[...] = str(dir_path.parent.parent.parent / bg_id[0:4] / bg_id[0:8] / f'MOUSE_{bg_id}_{config}_stacked.nxs') if bg_id else ''
+            rel_destination = ''
+            if bg_id:
+                destination = dir_path.parent.parent.parent / bg_id[0:4] / bg_id[0:8] / f'MOUSE_{bg_id}_{config}_stacked.nxs'
+                rel_destination = destination.relative_to(input_file, walk_up=True)
+            bg_file_dataset[...] = str(rel_destination)
+            # bg_file_dataset[...] = str(Path('..', '..') / bg_id[0:4] / bg_id[0:8] / f'MOUSE_{bg_id}_{config}_stacked.nxs') if bg_id else ''
             dbg_file_dataset = h5f.require_dataset('/entry1/processing_required_metadata/dispersed_background_file', shape=(), dtype=h5py.special_dtype(vlen=str))
-            dbg_file_dataset[...] = str(dir_path.parent.parent.parent / dbg_id[0:4] / dbg_id[0:8] / f'MOUSE_{dbg_id}_{config}_stacked.nxs') if dbg_id else ''
+            rel_destination = ''
+            if dbg_id:
+                destination = dir_path.parent.parent.parent / dbg_id[0:4] / dbg_id[0:8] / f'MOUSE_{dbg_id}_{config}_stacked.nxs'
+                rel_destination = destination.relative_to(input_file, walk_up=True)
+            # dbg_file_dataset[...] = str(dir_path.parent.parent.parent / dbg_id[0:4] / dbg_id[0:8] / f'MOUSE_{dbg_id}_{config}_stacked.nxs') if dbg_id else ''
+            dbg_file_dataset[...] = str(rel_destination)
+            # dbg_file_dataset[...] = str(Path('..', '..')  / dbg_id[0:4] / dbg_id[0:8] / f'MOUSE_{dbg_id}_{config}_stacked.nxs') if dbg_id else ''
         logger.info(f"Completed background adder step for {input_file}")
     except Exception as e:
         # Print the standard output and standard error
