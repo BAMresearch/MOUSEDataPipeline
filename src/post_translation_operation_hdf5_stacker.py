@@ -67,7 +67,8 @@ def canStack(filename:Path)->bool:
                 if not path in h5f:
                     logging.warning(f'path not found: {path} in file {filename}')
                     return False
-                if not Path(h5f[path][()].decode('utf-8')).is_file():
+                full_path = Path(filename.parent, h5f[path][()].decode('utf-8')).resolve() # relative paths
+                if not full_path.is_file():
                     logging.warning(f'file {h5f[path][()].decode('utf-8')} not found at: {path} in file {filename}')
                     return False
 
