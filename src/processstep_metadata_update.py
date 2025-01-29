@@ -93,7 +93,7 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
     # get the logbook entry for this measurement
     entry = findentry(ymd, batch, logbook_reader)
     energy = get_energy_from_h5(input_file, logger)
-    print(f'* * * * * * * * {energy=} * * * * * * * * ')
+    # print(f'* * * * * * * * {energy=} * * * * * * * * ')
     if entry is None:
         logger.info(f"metadata_updater cannot run for {dir_path}, no logbook entry found for {ymd=} and {batch=}")
         return
@@ -134,7 +134,7 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
         else: 
             dbg_identifier = 'None'
 
-        print(f'* * * * * * * * {entry.sample.calculate_overall_properties(energy)['overall_mu']=} * * * * * * * * ')
+        # print(f'* * * * * * * * {entry.sample.calculate_overall_properties(energy)['overall_mu']=} * * * * * * * * ')
 
         TElements += [
             TranslationElement(
