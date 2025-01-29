@@ -22,7 +22,7 @@ with details from the logbook and project/sample information
 """
 
 # Flag indicating whether this process step can be executed in parallel on multiple repetitions
-can_process_repetitions_in_parallel = True
+can_process_repetitions_in_parallel = False
 
 def can_run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2MouseReader, logger: logging.Logger) -> bool:
     """
