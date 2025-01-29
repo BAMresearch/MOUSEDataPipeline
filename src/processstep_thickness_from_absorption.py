@@ -55,9 +55,12 @@ def get_absorption_coefficient(filename: Path, logger: logging.Logger) -> float:
     try: 
         with h5py.File(filename, 'r') as h5f:
             absorption_coefficient = h5f['/entry1/sample/overall_mu'][()]
+        if isinstance(absorption_coefficient, list) or isinstance(absorption_coefficient, np.ndarray): 
+            absorption_coefficient = np.mean(absorption_coefficient)
     except Exception as e:
         logger.warning(f'could not read absorption coefficient from {filename} with error {e}')
         return 0.0
+    
     if not isinstance(absorption_coefficient, np.floating):
         logger.warning(f'absorption coefficient not found in file {filename}')
         return 0.0

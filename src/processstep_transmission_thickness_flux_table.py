@@ -43,7 +43,7 @@ def get_float_from_h5(filename: Path, HDFPath: str, logger: logging.Logger) -> f
         with h5py.File(filename, 'r') as h5f:
             val = h5f[HDFPath][()]
         if isinstance(val, list) or isinstance(val, np.ndarray): 
-            val = val[0]
+            val = np.mean(val)
     except Exception as e:
         logger.warning(f'could not read absorption coefficient from {filename} with error {e}')
         return 0.0
@@ -60,7 +60,7 @@ def get_str_from_h5(filename: Path, HDFPath: str, logger: logging.Logger) -> flo
         with h5py.File(filename, 'r') as h5f:
             val = h5f[HDFPath][()].decode('utf-8')
     except Exception as e:
-        logger.warning(f'could not read absorption coefficient from {filename} with error {e}')
+        logger.warning(f'could not read value {HDFPath} from {filename} with error {e}')
         return ''
     return val
 

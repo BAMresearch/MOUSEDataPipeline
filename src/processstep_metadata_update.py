@@ -4,12 +4,17 @@ import subprocess
 
 import HDF5Translator
 import h5py
+import numpy as np
 from YMD_class import YMD, extract_metadata_from_path
 from defaults_carrier import DefaultsCarrier
 from logbook2mouse.logbook_reader import Logbook2MouseReader
 import logging
 from HDF5Translator.translator_elements import TranslationElement
 from HDF5Translator.translator import process_translation_element
+from pint import UnitRegistry
+
+# Initialize the unit registry
+ureg = UnitRegistry()
 
 doc = """
 WIP: This processing step updates the metadata in the translated and beam-analyzed files 
@@ -31,13 +36,53 @@ def can_run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2M
 
     return True
 
-def findentry(ymd:YMD, batch:str, logbook_reader: Logbook2MouseReader):
+def findentry(ymd:YMD, batch:int, logbook_reader: Logbook2MouseReader):
     # print(f'searching for {ymd.YMD} and {batch}, type {type(ymd.YMD)} and {type(batch)}')
+    batch = int(batch)
     for entry in logbook_reader.entries:
         # print(f'checking {entry.ymd} and {entry.batchnum}, type {type(entry.ymd)} and {type(entry.batchnum)}')
         if entry.ymd == ymd.YMD and entry.batchnum == batch:
             return entry
     return None
+
+def get_energy_from_h5(filename: Path, logger: logging.Logger) -> float:
+    """
+    Returns the energy value from the HDF5 file via wavelength and conversion
+    """
+    try: 
+        with h5py.File(filename,'r') as h5f:
+            wavelength = h5f['/entry1/sample/beam/incident_wavelength'][()]
+            wavelength_units = h5f['/entry1/sample/beam/incident_wavelength'].attrs['units']
+    except Exception as e:
+        logger.warning(f'Could not read wavelength from {filename} with error {e}')
+        return 0.0
+
+    if isinstance(wavelength, (list, np.ndarray)):
+        wavelength = np.mean(wavelength)
+    
+    if not isinstance(wavelength, np.floating):
+        logger.warning(f'Incident wavelength not a float in {filename}')
+        return 0.0
+    
+    if wavelength <= 0:
+        logger.warning(f'Wavelength negative or zero in {filename}')
+        return 0.0
+    
+    try:
+        # Create a quantity with wavelength and its units
+        wavelength_quantity = wavelength * ureg(wavelength_units)
+
+        # Calculate energy using the formula E = hc/λ
+        energy_quantity = (ureg.planck_constant * ureg.speed_of_light) / wavelength_quantity
+
+        # Convert energy to keV
+        energy_keV = energy_quantity.to('keV').magnitude
+    except Exception as e:
+        logger.warning(f'Error converting wavelength to energy in {filename} with error {e}')
+        return 0.0
+    
+    return energy_keV
+
 
 def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2MouseReader, logger: logging.Logger):
     """
@@ -47,6 +92,8 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
     input_file = dir_path / f'MOUSE_{ymd}_{batch}_{repetition}.nxs'
     # get the logbook entry for this measurement
     entry = findentry(ymd, batch, logbook_reader)
+    energy = get_energy_from_h5(input_file, logger)
+    print(f'* * * * * * * * {energy=} * * * * * * * * ')
     if entry is None:
         logger.info(f"metadata_updater cannot run for {dir_path}, no logbook entry found for {ymd=} and {batch=}")
         return
@@ -87,6 +134,8 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
         else: 
             dbg_identifier = 'None'
 
+        print(f'* * * * * * * * {entry.sample.calculate_overall_properties(energy)['overall_mu']=} * * * * * * * * ')
+
         TElements += [
             TranslationElement(
                 # source is none since we're storing derived data
@@ -103,31 +152,41 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
                 destination='/entry1/sample/matrixfraction',
                 minimum_dimensionality=1,
                 data_type="string",
-                default_value=f'{entry.matrixfraction}',
+                default_value=entry.matrixfraction,
                 attributes={
                     "note": "The volume fraction that the matrix takes up in the total sample. For dilute samples, this approaches 1.0"
                 },
             ),   
             TranslationElement(
+                destination='/entry1/sample/overall_mu',
+                minimum_dimensionality=1,
+                data_type="float",
+                default_value=entry.sample.calculate_overall_properties(energy)['overall_mu'],
+                attributes={
+                    "note": "The volume fraction that the matrix takes up in the total sample. For dilute samples, this approaches 1.0",
+                },
+                source_units='1/m',
+                destination_units='1/m'
+            ),
+            TranslationElement(
                 # source is none since we're storing derived data
                 destination='/entry1/sample/density',
                 minimum_dimensionality=1,
                 data_type="float",
-                default_value=f'{entry.sample.density}',
+                default_value=entry.sample.density,
                 attributes={
                     "note": "Overall gravimetric density of the sample."
                 },
                 source_units='g/cm^3',
                 destination_units='g/cm^3'
-            ),   
-
+            ),
             # this might get updated if we have a different sample offset in the beam direction.
             TranslationElement(
                 # source is none since we're storing derived data
                 destination='/entry1/sample/transformations/sample_x',
                 minimum_dimensionality=1,
                 data_type="float",
-                default_value=f'{entry.sampleposition['xsam']}',
+                default_value=entry.sampleposition['xsam'],
                 attributes={
                     "depends_on" : '.',
                     "offset" : [0.0000000, 0.0000000, 0.0000000],
