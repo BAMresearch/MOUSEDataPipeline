@@ -151,8 +151,8 @@ class newNewConcat(object):
                 logging.debug(f'Link item found: {name= }, {obj= }')
 
             def addItem(name, obj):
-                # if name == 'entry1/sample/beam/incident_wavelength':
-                #     logging.debug(f'found the path: {name}')                
+                if 'entry1/instrument/detector/detectorSpecific' in name:
+                    logging.debug(f'found the path: {name} in file {ifname}')                
                 if isinstance(obj, h5py.Group):
                     logging.debug(f'adding group: {name}')
                     h5out.create_group(name)
