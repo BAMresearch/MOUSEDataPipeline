@@ -17,16 +17,7 @@ for ((batch=MIN_BATCH; batch<=MAX_BATCH; batch++)); do
     
     python src/directory_processor.py --config MOUSE_settings.yaml --ymd "$YMD" \
     --batch "$batch" --parallel --steps \
-    processstep_translator_step_1 \
-    processstep_translator_step_2 \
-    processstep_beamanalysis \
-    processstep_cleanup_files \
-    processstep_add_mask_file \
-    processstep_metadata_update \
-    processstep_add_background_files \
-    processstep_thickness_from_absorption \
-    processstep_transmission_thickness_flux_table \
-    # processstep_stacker
+    processstep_stacker
 
     # Check if the last command was successful
     if [ $? -ne 0 ]; then

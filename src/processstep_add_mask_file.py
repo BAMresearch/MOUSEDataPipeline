@@ -6,6 +6,8 @@ from YMD_class import YMD, extract_metadata_from_path
 from defaults_carrier import DefaultsCarrier
 from logbook2mouse.logbook_reader import Logbook2MouseReader
 import logging
+from HDF5Translator.translator_elements import TranslationElement
+from HDF5Translator.translator import process_translation_element
 
 doc = """
 This processing step finds the correct mask file for this measurement and adds it to the metadata
@@ -101,10 +103,46 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
         configuration = get_configuration(input_file, logger)
         mask_file = find_appropriate_mask(defaults, ymd, configuration, logger)
         # print(f'* * * * * * * * Found mask file: {mask_file} for configuration {input_file}')
-        # write result to HDF5 file: 
-        with h5py.File(input_file, 'a') as h5f:
-            mask_file_dataset = h5f.require_dataset('/entry1/processing_required_metadata/mask_file', shape=(), dtype=h5py.special_dtype(vlen=str))
-            mask_file_dataset[...] = str(mask_file.relative_to(input_file.parent, walk_up=True))
+        if mask_file is None:
+            logger.error(f"No suitable mask found for configuration {configuration} before {ymd}.")
+            return
+        # let's add the mask data from that mask file to the input file, using HDF5Translator elements:
+        TElements = [
+            TranslationElement(
+                # source is none since we're storing derived data
+                source="/entry/mask/Mask",
+                destination="/entry1/instrument/mask/Mask",
+                minimum_dimensionality=1,
+                data_type="int8",
+                default_value=None,
+                source_units="",
+                destination_units="",
+                attributes={
+                    "note": f"Added from the mask file {mask_file.as_posix()} by the processstep_add_mask_file."
+                },
+            ),
+            TranslationElement(
+                # source is none since we're storing derived data
+                source=None,
+                destination="/entry1/processing_required_metadata/mask_file",
+                minimum_dimensionality=1,
+                data_type="string",
+                default_value=str(mask_file.relative_to(input_file.parent, walk_up=True)),
+                attributes={
+                    "note": f"Added by the processstep_add_mask_file, relative to the location of the original preprocessed file."
+                },
+            ),
+        ]
+
+        # writing the resulting metadata back to the main HDF5 file
+        with h5py.File(mask_file, "r") as h5_in, h5py.File(input_file, "r+") as h5_out:
+            for element in TElements:  # iterate over the two elements and write them back
+                process_translation_element(h5_in, h5_out, element)
+
+        # # write filename to HDF5 file: 
+        # with h5py.File(input_file, 'a') as h5f:
+        #     mask_file_dataset = h5f.require_dataset('/entry1/processing_required_metadata/mask_file', shape=(), dtype=h5py.special_dtype(vlen=str))
+        #     mask_file_dataset[...] = str(mask_file.relative_to(input_file.parent, walk_up=True))
         logger.info(f"Completed translator step for {input_file}")
     except Exception as e:
         # Print the standard output and standard error

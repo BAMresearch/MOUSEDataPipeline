@@ -100,7 +100,7 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
         pto_file = defaults.post_translation_dir / 'post_translation_operation_hdf5_stacker.py'
         processed_files = get_processed_files(dir_path) # [str(f) for f in get_processed_files(dir_path)]
         files_by_config = sort_processed_files_by_instrument_configuration(processed_files, logger)
-
+        # print('files_by_config:', files_by_config)
         # did I do this right?
         for config, files in files_by_config.items():
             files_as_str = [str(f) for f in files]
@@ -114,6 +114,7 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
                 # '-l',
                 '-a', *files_as_str, # <-- processed files go here
             ]
+            print(' '.join(cmd))
             logger.info(f"Starting stacker step for {parent_path}")
             result = subprocess.run(cmd, check=True, capture_output=True, text=True)
             logger.debug(result.stdout)
