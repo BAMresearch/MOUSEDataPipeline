@@ -44,3 +44,32 @@ def processing_possible(dir_path: Path, return_list:bool = False) -> bool:
         return False
 
     return True
+
+def processing_possible_scan(dir_path: Path, return_list:bool = False) -> bool:
+    """
+    This method checks if the processing is needed for a given repetition. 
+    """
+    missing_list = []
+
+    if not (len_files_in_path(dir_path, '../beam_profile/eiger_*_master.h5')==1):
+        # missing direct beam file
+        missing_list.append('../beam_profile/eiger_*_master.h5')
+
+    if not (len_files_in_path(dir_path, '../beam_profile/im_craw.nxs')==1):
+        # missing im_craw for direct beam file
+        missing_list.append('../beam_profile/im_craw.nxs')
+
+    if not (len_files_in_path(dir_path, 'eiger_*_master.h5') == 1):
+        # missing or too many eiger files. 
+        missing_list.append('eiger_*_master.h5')
+
+    if not (len_files_in_path(dir_path, 'im_craw.nxs') == 1):
+        # missing im_craw files. 
+        missing_list.append('im_craw.h5')
+
+    if return_list:
+        return missing_list
+    elif len(missing_list) > 0:
+        return False
+
+    return True
