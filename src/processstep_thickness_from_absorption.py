@@ -79,7 +79,7 @@ def calculate_thickness(absorption_coefficient: float, absorption: float, logger
     if not (0 < absorption <= 1):
         logger.warning(f'absorption value {absorption} is not in the range [0, 1]')
         return -1
-    thickness = -1 * np.log(absorption) / absorption_coefficient
+    thickness = -1 * np.log(1-absorption) / absorption_coefficient
     return thickness
 
 def get_background_file(filename: Path, logger: logging.Logger) -> Path:
