@@ -8,6 +8,7 @@ from logbook2mouse.logbook_reader import Logbook2MouseReader
 import logging
 from HDF5Translator.translator_elements import TranslationElement
 from HDF5Translator.translator import process_translation_element
+from datetime import datetime
 
 doc = """
 This processing step finds the correct mask file for this measurement and adds it to the metadata
@@ -15,6 +16,7 @@ This processing step finds the correct mask file for this measurement and adds i
 
 # Flag indicating whether this process step can be executed in parallel on multiple repetitions
 can_process_repetitions_in_parallel = True
+
 
 def can_run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2MouseReader, logger: logging.Logger) -> bool:
     """
@@ -26,6 +28,7 @@ def can_run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2M
         logger.info(f"Mask file determination not possible for {dir_path}, file missing at: {step_2_file}")
         return False
     return True
+
 
 def get_configuration(filename: Path, logger: logging.Logger) -> int:
     """
@@ -39,9 +42,6 @@ def get_configuration(filename: Path, logger: logging.Logger) -> int:
         configuration = 0
     return configuration
 
-from pathlib import Path
-import logging
-from datetime import datetime
 
 def find_appropriate_mask(defaults: DefaultsCarrier, measurement_ymd: YMD, configuration: int, logger: logging.Logger) -> Path:
     """
