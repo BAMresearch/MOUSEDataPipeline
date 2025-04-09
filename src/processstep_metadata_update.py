@@ -17,12 +17,13 @@ from pint import UnitRegistry
 ureg = UnitRegistry()
 
 doc = """
-WIP: This processing step updates the metadata in the translated and beam-analyzed files 
+WIP: This processing step updates the metadata in the translated and beam-analyzed files
 with details from the logbook and project/sample information
 """
 
 # Flag indicating whether this process step can be executed in parallel on multiple repetitions
 can_process_repetitions_in_parallel = False
+
 
 def can_run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2MouseReader, logger: logging.Logger) -> bool:
     """
@@ -36,6 +37,7 @@ def can_run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2M
 
     return True
 
+
 def findentry(ymd:YMD, batch:int, logbook_reader: Logbook2MouseReader):
     # print(f'searching for {ymd.YMD} and {batch}, type {type(ymd.YMD)} and {type(batch)}')
     batch = int(batch)
@@ -44,6 +46,7 @@ def findentry(ymd:YMD, batch:int, logbook_reader: Logbook2MouseReader):
         if entry.ymd == ymd.YMD and entry.batchnum == batch:
             return entry
     return None
+
 
 def get_energy_from_h5(filename: Path, logger: logging.Logger) -> float:
     """
@@ -59,15 +62,15 @@ def get_energy_from_h5(filename: Path, logger: logging.Logger) -> float:
 
     if isinstance(wavelength, (list, np.ndarray)):
         wavelength = np.mean(wavelength)
-    
+
     if not isinstance(wavelength, np.floating):
         logger.warning(f'Incident wavelength not a float in {filename}')
         return 0.0
-    
+
     if wavelength <= 0:
         logger.warning(f'Wavelength negative or zero in {filename}')
         return 0.0
-    
+
     try:
         # Create a quantity with wavelength and its units
         wavelength_quantity = wavelength * ureg(wavelength_units)
@@ -80,7 +83,7 @@ def get_energy_from_h5(filename: Path, logger: logging.Logger) -> float:
     except Exception as e:
         logger.warning(f'Error converting wavelength to energy in {filename} with error {e}')
         return 0.0
-    
+
     return energy_keV
 
 
@@ -188,8 +191,8 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
                 data_type="float",
                 default_value=entry.sampleposition['xsam'],
                 attributes={
-                    "depends_on" : '.',
-                    "offset" : [0.0000000, 0.0000000, 0.0000000],
+                    "depends_on": '.',
+                    "offset": [0.0000000, 0.0000000, 0.0000000],
                     "offset_units": 'mm',
                     "transformation_type": 'translation',
                     "units": 'mm',
@@ -200,7 +203,6 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
                 destination_units='mm'
             ),   
         ]
-
 
         update_from_logbook = {
             '/entry1/processing_required_metadata/procpipeline': entry.procpipeline,
