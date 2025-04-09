@@ -65,7 +65,7 @@ def processing_possible_scan(dir_path: Path, return_list:bool = False) -> bool:
 
     if not (len_files_in_path(dir_path, 'im_craw.nxs') == 1):
         # missing im_craw files. 
-        missing_list.append('im_craw.h5')
+        missing_list.append('im_craw.nxs')
 
     if return_list:
         return missing_list
