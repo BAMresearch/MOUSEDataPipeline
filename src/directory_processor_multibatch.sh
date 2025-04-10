@@ -19,6 +19,7 @@ for ((batch=MIN_BATCH; batch<=MAX_BATCH; batch++)); do
     --batch "$batch" --parallel --steps \
     processstep_translator_step_1 \
     processstep_translator_step_2 \
+    processstep_average_to_counts \
     processstep_beamanalysis \
     processstep_cleanup_files \
     processstep_add_mask_file \
