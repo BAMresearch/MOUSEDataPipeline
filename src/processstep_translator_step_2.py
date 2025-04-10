@@ -38,8 +38,8 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
             '-C', str(defaults.translator_template_dir / 'BAM_new_MOUSE_dectris_adder_configuration.yaml'),
             '-T', str(template_file),
             '-I', str(input_file),
-            '-O', str(output_file), 
-            '-d'
+            '-O', str(output_file),
+            '-d',
         ]
         logger.info(f"Starting translator step 2 for {input_file}")
         result = subprocess.run(cmd, check=True, capture_output=True, text=True)
