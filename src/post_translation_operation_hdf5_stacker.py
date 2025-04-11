@@ -86,7 +86,14 @@ class newNewConcat(object):
     core = None
     stackItems = None
 
-    def __init__(self, outputFile:Path = None, filenames:list = [], stackItems:list = [], calculate_average:list = []):
+    def __init__(
+            self, 
+            outputFile:Path = None, 
+            filenames:list = [], 
+            stackItems:list = [], 
+            calculate_average:list = [],
+            adjust_relative_path_oneup:list = []
+            ):
         assert isinstance(outputFile, Path), 'output filename must be a path instance'
         assert len(filenames) > 0, 'at least one file is required for stacking.'
         # assert that the filenames to stack all exist:
@@ -120,7 +127,38 @@ class newNewConcat(object):
         # now we calculate the mean, std and standard error on the mean of selected datasets:
         for path in calculate_average:
             self.calculateAverage(path)
-    
+
+        for path in adjust_relative_path_oneup:
+            self.adjustRelativePath(path)
+        
+    def adjustRelativePath(self, path):
+        """
+        adjusts the relative paths in the location to be one level up, 
+        e.g. "../../Mask/file.nxs" becomes "../Mask/file.nxs"        
+        """
+        with h5py.File(self.outputFile, 'a') as h5out:
+            if not path in h5out:
+                logging.warning(f'path {path} not found in output file, skipping')    
+                return
+
+            oldPath = h5out[path][()]
+            if oldPath is None:
+                logging.debug(f'path {path} is empty, skipping')
+                return
+            if isinstance(oldPath, bytes):
+                oldPath = oldPath.decode('utf-8')
+
+            if oldPath == '':
+                logging.debug(f'path {path} is empty, skipping')
+                return
+            oldPath = Path(h5out[path][()].decode('utf-8'))
+            try:
+                newPath = oldPath.relative_to('..')
+            except ValueError:
+                logging.warning(f'path {path} already at root level or cannot be made relative to parent, skipping')
+                return
+            h5out[path][...] = str(newPath)
+
     def calculateAverage(self, path):
         with h5py.File(self.outputFile, 'a') as h5out:
             if path in h5out:
@@ -216,10 +254,11 @@ def main(
         config = yaml.safe_load(f)
         stack_datasets = config.get("stack_datasets", None)
         calculate_average = config.get("calculate_average", None)
+        adjust_relative_path_oneup = config.get("adjust_relative_path_oneup", None)
     # at least the stack_datasets dictionary must exist: 
     assert stack_datasets is not None, "The configuration file must contain a 'stack_datasets' section."
     # Stack the datasets
-    newNewConcat(output, auxiliary_files, stack_datasets, calculate_average)
+    newNewConcat(output, auxiliary_files, stack_datasets, calculate_average, adjust_relative_path_oneup)
 
     logging.info("Post-translation processing complete.")
 
