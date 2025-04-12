@@ -42,7 +42,9 @@ def sort_processed_files_by_instrument_configuration(processed_files: List[Path]
 
     # Sort each list of files by their modification time (optional)
     for config, files in config_to_files.items():
-        config_to_files[config] = sorted(files, key=lambda f: f.stat().st_mtime)
+        # new sorting to make sure all filenames are sorted by repetition number
+        config_to_files[config] = sorted(files, key=lambda f: int(f.stem.rsplit('_', 1)[-1]))
+        # config_to_files[config] = sorted(files, key=lambda f: f.stat().st_mtime)
 
     return config_to_files
 
