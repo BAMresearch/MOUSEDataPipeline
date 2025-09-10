@@ -25,7 +25,7 @@ def can_run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2M
     ymd, batch, repetition = extract_metadata_from_path(dir_path)
     step_2_file = dir_path / f'MOUSE_{ymd}_{batch}_{repetition}.nxs'
     if not step_2_file.is_file():
-        logger.info(f"Mask file determination not possible for {dir_path}, file missing at: {step_2_file}")
+        logger.warning(f"Mask file determination not possible for {dir_path}, file missing at: {step_2_file}")
         return False
     return True
 
@@ -40,7 +40,7 @@ def get_configuration(filename: Path, logger: logging.Logger) -> int:
     except Exception as e:
         logger.error(f"Error reading configuration from file: {e}")
         configuration = 0
-    return configuration
+    return int(configuration)
 
 
 def find_appropriate_mask(defaults: DefaultsCarrier, measurement_ymd: YMD, configuration: int, logger: logging.Logger) -> Path:
@@ -76,7 +76,7 @@ def find_appropriate_mask(defaults: DefaultsCarrier, measurement_ymd: YMD, confi
     measurement_date = datetime.strptime(measurement_ymd.YMD, "%Y%m%d")
     best_mask = None
     smallest_difference = None
-
+    logger.info(f"Searching mask for configuration {configuration=} before {measurement_ymd=}.")
     for mask_file, mask_ymd in matching_masks:
         if mask_ymd <= measurement_date:
             difference = (measurement_date - mask_ymd).days
@@ -86,6 +86,7 @@ def find_appropriate_mask(defaults: DefaultsCarrier, measurement_ymd: YMD, confi
 
     if best_mask:
         logger.info(f"Selected mask file: {best_mask}")
+        # print(f"Selected mask file: {best_mask}")
     else:
         logger.warning(f"No suitable mask found for configuration {configuration} before {measurement_ymd}.")
     

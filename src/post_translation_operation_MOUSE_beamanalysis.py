@@ -69,7 +69,7 @@ def beam_analysis(imageData: np.ndarray, ROI_SIZE: int) -> Union[tuple, float]:
     """
 
     # Step 1: get rid of masked or pegged pixels on an Eiger detector
-    labeled_foreground = (np.logical_and(imageData >= 0, imageData <= 1e9)).astype(int)
+    labeled_foreground = (np.logical_and(imageData >= 0, imageData <= 2e7)).astype(int)
     maskedTwoDImage = imageData * labeled_foreground  # apply mask
     threshold_value = np.maximum(
         1, 0.0001 * maskedTwoDImage.max()
