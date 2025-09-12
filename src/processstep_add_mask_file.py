@@ -9,6 +9,7 @@ import logging
 from HDF5Translator.translator_elements import TranslationElement
 from HDF5Translator.translator import process_translation_element
 from datetime import datetime
+from utilities import get_configuration
 
 doc = """
 This processing step finds the correct mask file for this measurement and adds it to the metadata
@@ -28,19 +29,6 @@ def can_run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2M
         logger.warning(f"Mask file determination not possible for {dir_path}, file missing at: {step_2_file}")
         return False
     return True
-
-
-def get_configuration(filename: Path, logger: logging.Logger) -> int:
-    """
-    Read the configuration file and return the configuration
-    """
-    try:
-        with h5py.File(filename, 'r') as h5f:
-            configuration = h5f['/entry1/instrument/configuration'][()]
-    except Exception as e:
-        logger.error(f"Error reading configuration from file: {e}")
-        configuration = 0
-    return int(configuration)
 
 
 def find_appropriate_mask(defaults: DefaultsCarrier, measurement_ymd: YMD, configuration: int, logger: logging.Logger) -> Path:

@@ -1,8 +1,5 @@
-
-
-
 from pathlib import Path
-import subprocess
+# import subprocess
 
 import h5py
 import numpy as np
@@ -13,6 +10,7 @@ import logging
 from HDF5Translator.translator_elements import TranslationElement
 from HDF5Translator.translator import process_translation_element
 import csv
+from utilities import get_float_from_h5, get_str_from_h5
 
 
 doc = """
@@ -22,6 +20,7 @@ X-ray absorption and the X-ray absorption coefficient calculated from the compos
 
 # Flag indicating whether this process step can be executed in parallel on multiple repetitions
 can_process_repetitions_in_parallel = False
+
 
 def can_run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2MouseReader, logger: logging.Logger) -> bool:
     """
@@ -34,35 +33,6 @@ def can_run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2M
         return False
 
     return True
-
-def get_float_from_h5(filename: Path, HDFPath: str, logger: logging.Logger) -> float:
-    """
-    Returns the value from the HDF5 file at HDFPath.
-    """
-    try: 
-        with h5py.File(filename, 'r') as h5f:
-            val = h5f[HDFPath][()]
-        if isinstance(val, list) or isinstance(val, np.ndarray): 
-            val = np.mean(val)
-    except Exception as e:
-        logger.warning(f'could not read absorption coefficient from {filename} with error {e}')
-        return 0.0
-    if not isinstance(val, np.floating):
-        logger.warning(f'absorption coefficient not found in file {filename}')
-        return 0.0
-    return val
-
-def get_str_from_h5(filename: Path, HDFPath: str, logger: logging.Logger) -> float:
-    """
-    Returns the value from the HDF5 file at HDFPath.
-    """
-    try: 
-        with h5py.File(filename, 'r') as h5f:
-            val = h5f[HDFPath][()].decode('utf-8')
-    except Exception as e:
-        logger.warning(f'could not read value {HDFPath} from {filename} with error {e}')
-        return ''
-    return val
 
 
 def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2MouseReader, logger: logging.Logger):
@@ -88,7 +58,7 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
 
     try:
         logger.info(f"Starting thickness_from_absorption step for {input_file}")
-      # Gather the needed data
+        # Gather the needed data
         data = {
             'filename': input_file.name,
             'ymd': ymd,

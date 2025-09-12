@@ -8,45 +8,15 @@ from defaults_carrier import DefaultsCarrier
 from logbook2mouse.logbook_reader import Logbook2MouseReader
 import logging
 
-from processstep_add_mask_file import get_configuration
+from utilities import get_processed_files, sort_processed_files_by_instrument_configuration
 
 doc = """
-WIP: This special processing step combines all repetitions in a batch. 
+WIP: This special processing step combines all repetitions in a batch.
 """
 
 # Flag indicating whether this process step can be executed in parallel on multiple repetitions
-can_process_repetitions_in_parallel = False # we do this once per batch, so if we do it for one repetition, we don't need to do it again
+can_process_repetitions_in_parallel = False  # we do this once per batch, so if we do it for one repetition, we don't need to do it again
 
-def get_processed_files(dir_path: Path) -> List[Path]:
-    ymd, batch, repetition = extract_metadata_from_path(dir_path)
-    parent_path = dir_path.parent
-    print(parent_path)
-    processed_files = list(parent_path.glob(f'{ymd.YMD}_{batch}_*/MOUSE_{ymd.YMD}_{batch}_*.nxs'))
-    return processed_files
-
-def sort_processed_files_by_instrument_configuration(processed_files: List[Path], logger: logging.Logger) -> Dict[str, List[Path]]:
-    """
-    Sorts the processed files by instrument configuration, as read from the processed files themselves.
-    Outputs a dictionary with the instrument configuration as the key and a sorted list of processed files as the value.
-    """
-    config_to_files: Dict[str, List[Path]] = {}
-
-    for f in processed_files:
-        measurement_config = str(get_configuration(f, logger))
-        
-        # Add the file to the dictionary under the correct key
-        if measurement_config not in config_to_files:
-            config_to_files[measurement_config] = []
-        
-        config_to_files[measurement_config].append(f)
-
-    # Sort each list of files by their modification time (optional)
-    for config, files in config_to_files.items():
-        # new sorting to make sure all filenames are sorted by repetition number
-        config_to_files[config] = sorted(files, key=lambda f: int(f.stem.rsplit('_', 1)[-1]))
-        # config_to_files[config] = sorted(files, key=lambda f: f.stat().st_mtime)
-
-    return config_to_files
 
 def processing_needed_for_config(dir_path: Path, ymd: YMD, batch: str, config: str, processed_files: List[Path], logger: logging.Logger) -> bool:
     parent_path = dir_path.parent

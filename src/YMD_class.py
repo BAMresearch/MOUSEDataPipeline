@@ -30,6 +30,9 @@ def extract_metadata_from_path(dir_path: Path) -> Tuple[YMD, int, int]:
     """
     Extracts YMD, batch, and repetition metadata from a directory path.
     """
+    # check if this is not actually a file path, and if so, get the parent directory
+    if dir_path.is_file():
+        dir_path = dir_path.parent
     last_path = dir_path.parts[-1]
     parts = last_path.split('_')
     assert len(parts) == 3, f"Invalid directory format: {dir_path}"

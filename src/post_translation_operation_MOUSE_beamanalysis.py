@@ -24,16 +24,17 @@ requires scikit-image
 import argparse
 import logging
 from pathlib import Path
-from typing import Tuple, Union
+from typing import Tuple, Union, Optional
 import hdf5plugin  # loaded BEFORE h5py
 import h5py
 import numpy as np
 from skimage.measure import regionprops
+from skimage import measure, morphology # for new beam analysis
 from HDF5Translator.utils.data_utils import sanitize_attribute
 from HDF5Translator.utils.validators import (
     validate_file
 )
-from HDF5Translator.utils.argparse_utils import KeyValueAction 
+from HDF5Translator.utils.argparse_utils import KeyValueAction
 from HDF5Translator.utils.configure_logging import configure_logging
 from HDF5Translator.translator_elements import TranslationElement
 from HDF5Translator.translator import process_translation_element
@@ -57,47 +58,168 @@ You can replace the calculation and file read/write logic according to your spec
 #         image = h5f[h5imagepath][()]
 #     return image
 
+
 def reduce_extra_image_dimensions(image:np.ndarray, method=np.mean)->np.ndarray:
     assert method in [np.mean, np.sum], "method must be either np.mean or np.sum function handles"
     while image.ndim > 2:
         image = method(image, axis=0)
     return image
 
-def beam_analysis(imageData: np.ndarray, ROI_SIZE: int) -> Union[tuple, float]:
-    """
-    Perform beam analysis on the given image data, returning the beam center and flux.
-    """
 
+def new_beam_analysis(imageData: np.ndarray, coverage: float = 0.99, ellipse_mask:Optional[np.ndarray] = None) -> Union[tuple, float, np.ndarray]:
+    
+    def _ellipse_mask_from_regionprops(
+            reg: measure._regionprops.RegionProperties,
+            shape,
+            coverage: float
+            ) -> Union[np.ndarray, np.ndarray]:
+        """
+        Build a full-image boolean mask of the k·σ ellipse defined by the
+        region's intensity-weighted centroid and covariance, where k gives
+        the requested 2-D Gaussian coverage. - GPT code...
+        """
+        # 1) center and weighted moments
+        cy, cx = reg.weighted_centroid
+        mu_c = reg.weighted_moments_central
+        m00  = reg.weighted_moments[0, 0]
+        if m00 <= 0:
+            return np.zeros(shape, dtype=bool)
+
+        # 2) covariance (row, col)
+        var_r  = mu_c[0, 2] / m00
+        var_c  = mu_c[2, 0] / m00
+        cov_rc = mu_c[1, 1] / m00
+        cov = np.array([[var_r, cov_rc],
+                        [cov_rc, var_c]], dtype=float)
+        cov = (cov + cov.T) / 2.0  # symmetrize
+        cov_inv = np.linalg.inv(cov + 1e-12 * np.eye(2))
+
+        # 3) coverage -> radius k
+        coverage = float(np.clip(coverage, 1e-6, 1 - 1e-9))
+        k = float(np.sqrt(-2.0 * np.log(1.0 - coverage)))
+
+        # 4) Mahalanobis distance mask
+        rr, cc = np.indices(shape)
+        dr = rr - cy
+        dc = cc - cx
+        md2 = (
+            cov_inv[0, 0]*dr*dr +
+            2.0*cov_inv[0, 1]*dr*dc +
+            cov_inv[1, 1]*dc*dc
+            )
+        
+        # --- Peak widths (σ) and orientation ---
+        evals, evecs = np.linalg.eigh(cov)  # eigenvalues ascending
+        evals = np.clip(evals, 0.0, None)      # no negative variances
+        sigma_minor, sigma_major = np.sqrt(evals[0]), np.sqrt(evals[1])
+
+        # Orientation of major axis (CCW from row-axis)
+        v_major = evecs[:, 1]
+        theta = float(np.arctan2(v_major[0], v_major[1]))
+
+        return md2 <= (k**2), md2, sigma_minor, sigma_major, theta
+
+    def refine_k_for_exact_coverage(
+            md2, 
+            base_mask, 
+            img, 
+            target, 
+            k_lo:float=0.5, 
+            k_hi:float=5.0, 
+            steps:int=8
+            ) -> float:
+        """
+            Real peaks deviate from perfect Gaussians. This 10-line bisection nudges k
+            so the integrated fraction over your peak matches the target: - GPT code
+        """
+        total = float(img[base_mask].sum())
+        for _ in range(steps):
+            k_mid = 0.5*(k_lo + k_hi)
+            frac = float(img[(md2 <= k_mid*k_mid) & base_mask].sum()) / total
+            if frac < target:
+                k_lo = k_mid
+            else:
+                k_hi = k_mid
+        return 0.5*(k_lo + k_hi)
+
+
+    # Now you can do operations, such as determining a beam center and flux. For that, we need to
+    # do a few steps...
+
+    # if we don't have a mask yet, we need to determine one (for direct_beam only. sample_beam should use the direct beam mask)
     # Step 1: get rid of masked or pegged pixels on an Eiger detector
     labeled_foreground = (np.logical_and(imageData >= 0, imageData <= 2e7)).astype(int)
     maskedTwoDImage = imageData * labeled_foreground  # apply mask
-    threshold_value = np.maximum(
-        1, 0.0001 * maskedTwoDImage.max()
-    )  # filters.threshold_otsu(maskedTwoDImage) # ignore zero pixels
-    print(f'{threshold_value=}')
-    labeled_peak = (maskedTwoDImage > threshold_value).astype(int)  # label peak
-    properties = regionprops(labeled_peak, imageData)  # calculate region properties
-    if len(properties) == 0:  # no beam found
-        return (0,0), 0
-    # continue normally if beam found
-    center_of_mass = properties[0].centroid  # center of mass (unweighted by intensity)
-    weighted_center_of_mass = properties[0].weighted_centroid  # center of mass (weighted)
-    # determine the total intensity in the region of interest, this will be later divided by measuremet time to get the flux
-    ITotal_region = np.sum(
-        maskedTwoDImage[
-            np.maximum(int(weighted_center_of_mass[0] - ROI_SIZE), 0) : np.minimum(
-                int(weighted_center_of_mass[0] + ROI_SIZE), maskedTwoDImage.shape[0]
-            ),
-            np.maximum(int(weighted_center_of_mass[1] - ROI_SIZE), 0) : np.minimum(
-                int(weighted_center_of_mass[1] + ROI_SIZE), maskedTwoDImage.shape[1]
-            ),
-        ]
-    )
-    # for your info:
-    logging.debug(f"{center_of_mass=}")
-    logging.debug(f"{ITotal_region=} counts")
+    sigma_minor, sigma_major, theta = None, None, None
+    if ellipse_mask is not None:
+        assert ellipse_mask.shape == imageData.shape, "Provided ellipse_mask must have the same shape as imageData"
+        ellipse_mask = ellipse_mask.astype(int)
+    else:
+        threshold_value = np.maximum(
+            1, 1*maskedTwoDImage.mean() # 0.0001 * maskedTwoDImage.max()
+        )  # filters.threshold_otsu(maskedTwoDImage) # ignore zero pixels
+        # print(f'{threshold_value=}')
 
-    return weighted_center_of_mass, ITotal_region
+        # Step 1: binary mask of "candidate bright regions"
+        mask = maskedTwoDImage > threshold_value
+
+        # Step 2: label connected components
+        # labels = measure.label(mask, connectivity=2)
+        labels, num = measure.label(
+            morphology.convex_hull_image(  # we expect the beam to be convex
+                morphology.remove_small_holes(  # with moly we may see small dead pixels in the beam
+                    morphology.remove_small_objects(  # we don't care about isolated spikes
+                        mask,
+                        min_size=20
+                        ),
+                    area_threshold=20
+                    ),
+                ),
+            connectivity=1,
+            return_num=True
+            )
+
+        # Step 3: ensure we only have the main feature
+        if num == 0:
+            raise ValueError("No beam found in the image.")
+        if num > 1:
+            print("Multiple beams found in the image, selecting the largest one.")
+            # find the largest component and keep only that one
+            largest_label = np.argmax(np.bincount(labels.flat)[1:]) + 1  # skip background label 0
+            labels = (labels == largest_label).astype(int)
+        # assert we only have one labeled region now
+        assert np.unique(labels).size == 2, "More than one labeled region found."
+
+        # step 4: calculate region properties
+        properties = regionprops(labels, imageData)  # calculate region properties
+
+        # GPT addition:
+        # --- NEW: shrink the region to desired intensity coverage (e.g., 95%) ---
+        coverage_target = coverage
+        ellipse_mask, md2, sigma_minor, sigma_major, theta = _ellipse_mask_from_regionprops(
+            properties[0],
+            imageData.shape,
+            coverage_target
+            )
+        # Keep the ellipse inside the original label to avoid bleeding into neighbors
+        # ellipse_mask &= (labels.astype(bool))
+        # refine for the actual peak not a gaussian peak: 
+        k = refine_k_for_exact_coverage(md2, (labels > 0), maskedTwoDImage, coverage_target)
+        ellipse_mask = (md2 <= k*k) & (labels > 0)
+        kept_intensity = float(maskedTwoDImage[ellipse_mask].sum())
+        achieved_coverage = kept_intensity / properties[0].intensity_image.sum()
+        print(f"Refined k={k:.3f} to achieve coverage {achieved_coverage:.4f} ({coverage_target=})")
+        ellipse_mask = ellipse_mask.astype(int)
+
+    properties = regionprops(ellipse_mask, imageData)  # calculate region properties
+    # continue normally if beam found
+    # center_of_mass = properties[0].centroid  # center of mass (unweighted by intensity)
+    weighted_center_of_mass = properties[0].weighted_centroid  # center of mass (weighted)
+    # get the intensity in the region of interest
+    ITotal_region = float(properties[0].intensity_image.sum())
+    ITotal_overall = float(maskedTwoDImage.sum())
+
+    return weighted_center_of_mass, ITotal_region, ITotal_overall, ellipse_mask, sigma_minor, sigma_major, theta
 
 
 # If you are adjusting the template for your needs, you probably only need to touch the main function:
@@ -118,20 +240,29 @@ def main(
     """
     # Process input parameters:
     # Define the size of the region of interest (ROI) for beam center determination (in +/- pixels from center)
-    ROI_SIZE = getFromKeyVals(
-        "roi_size", keyvals, 25
-    )  # Size of the region of interest (ROI) for beam center determination. your beam center should be at least this far from the edge
+    # coverageTarget = getFromKeyVals(
+    #     "roi_size", keyvals, 25
+    # )  # Size of the region of interest (ROI) for beam center determination. your beam center should be at least this far from the edge
     imageType = getFromKeyVals(
         "image_type", keyvals, "direct_beam"
     )  # can be either direct_beam or sample_beam. This sets the paths and the output location
     logging.info(
-        f"Processing {imageType} image in file {filename} with ROI size of {ROI_SIZE} pixels."
+        f"Processing {imageType} image in file {filename}"
     )
 
     # Define the paths in the HDF5 file where the data is stored and where the results should be written
     TransmissionOutPath = "/entry1/sample/transmission"
+    ImageTransmissionOutPath = "/entry1/sample/transmission_image"
+    TransmissionCorrectionFactorOutPath = "/entry1/sample/transmission_correction_factor"
+    SigmaMinorOutPath = "/entry1/processing/direct_beam_profile/beam_analysis/sigma_minor"
+    SigmaMajorOutPath = "/entry1/processing/direct_beam_profile/beam_analysis/sigma_major"
+    ThetaOutPath = "/entry1/processing/direct_beam_profile/beam_analysis/theta"
+
     SampleFluxOutPath = "/entry1/processing/sample_beam_profile/beam_analysis/flux"
     DirectFluxOutPath = "/entry1/sample/beam/flux"
+    SampleFluxOverImagePath = "/entry1/processing/direct_beam_profile/beam_analysis/FluxOverImage"
+    DirectFluxOverImagePath = "/entry1/processing/sample_beam_profile/beam_analysis/FluxOverImage"
+    BeamMaskPath = "/entry1/processing/direct_beam_profile/beam_analysis/BeamMask"
     if imageType == "direct_beam":
         BeamDatapath = "/entry1/processing/direct_beam_profile/data"
         BeamDurationPath = (
@@ -141,6 +272,7 @@ def main(
         xOutPath = "/entry1/instrument/detector00/transformations/det_y"
         zOutPath = "/entry1/instrument/detector00/transformations/det_z"
         FluxOutPath = DirectFluxOutPath
+        FluxOverImagePath = DirectFluxOverImagePath
     elif imageType == "sample_beam":
         BeamDatapath = "/entry1/processing/sample_beam_profile/data"
         BeamDurationPath = (
@@ -150,6 +282,7 @@ def main(
         xOutPath = None  # no need to store these as we get the beam center from the direct beam
         zOutPath = None
         FluxOutPath = SampleFluxOutPath
+        FluxOverImagePath = SampleFluxOverImagePath
 
     else:
         logging.error(
@@ -157,19 +290,31 @@ def main(
         )
         return
 
-    # print(f'{BeamDatapath=}, {BeamDurationPath=}, {COMOutPath=}, {xOutPath=}, {zOutPath=}, {FluxOutPath=}')
-
     # reading from the main HDF5 file
     with h5py.File(filename, "r") as h5_in:
         # Read necessary information (this is just a placeholder, adapt as needed)
         imageData = h5_in[BeamDatapath][()]
         # mean because count_time is the frame time minus the readout time. 
         recordingTime = h5_in[BeamDurationPath][()]
+        # read the beam mask if it exists (for sample beam analysis), otherwise None
+        ellipse_mask = h5_in.get(BeamMaskPath, default=None)
+        ellipse_mask = ellipse_mask[()] if ellipse_mask is not None else None
+        # ellipse_mask = None
+        # if BeamMaskPath in h5_in:
+        #     ellipse_mask = h5_in[BeamMaskPath][()]
+    if imageType == "sample_beam":
+        assert ellipse_mask is not None, "For sample_beam analysis, the beam mask must be provided from the direct_beam analysis."
+
     imageData = reduce_extra_image_dimensions(imageData, method=np.mean)
 
     # Now you can do operations, such as determining a beam center and flux. For that, we need to
     # do a few steps...
-    center_of_mass, ITotal_region = beam_analysis(imageData, ROI_SIZE)
+    # center_of_mass, ITotal_region = beam_analysis(imageData, ROI_SIZE)
+    center_of_mass, ITotal_region, ITotal_overall, ellipse_mask, sigma_minor, sigma_major, theta = new_beam_analysis(
+        imageData,
+        coverage=0.99,
+        ellipse_mask=ellipse_mask
+        )
     logging.info(
         f"Beam center: {center_of_mass}, Flux: {ITotal_region / recordingTime} counts/s."
     )
@@ -179,6 +324,18 @@ def main(
     TElements += [
         TranslationElement(
             # source is none since we're storing derived data
+            destination=BeamMaskPath,
+            minimum_dimensionality=2,
+            data_type="float32",
+            default_value=ellipse_mask,
+            source_units="px",
+            destination_units="px",
+            attributes={
+                "note": "Mask used for the beam intensity determination, originating from beam_analysis post-translation processing script."
+            },
+        ),
+        TranslationElement(
+            # source is none since we're storing derived data
             destination=COMOutPath,
             minimum_dimensionality=1,
             data_type="float32",
@@ -186,7 +343,7 @@ def main(
             source_units="px",
             destination_units="px",
             attributes={
-                "note": "Determined by the beam_analysis post-translation processing script."
+                "note": "Intensity weighted center of mass, determined by the beam_analysis post-translation processing script."
             },
         ),
         TranslationElement(
@@ -197,7 +354,18 @@ def main(
             destination_units="counts/s",
             minimum_dimensionality=1,
             attributes={
-                "note": "Determined by the beam_analysis post-translation processing script."
+                "note": "Flux over the beam only, determined by the beam_analysis post-translation processing script."
+            },
+        ),
+        TranslationElement(
+            # source is none since we're storing derived data
+            destination=FluxOverImagePath,
+            default_value=ITotal_overall / recordingTime,
+            data_type="float",
+            destination_units="counts/s",
+            minimum_dimensionality=1,
+            attributes={
+                "note": "Flux over the total image, determined by the beam_analysis post-translation processing script."
             },
         ),
     ]
@@ -248,13 +416,21 @@ def main(
         sampleBeamFlux = h5_in.get(SampleFluxOutPath, default=None)
         directBeamFlux = directBeamFlux[()] if directBeamFlux is not None else None
         sampleBeamFlux = sampleBeamFlux[()] if sampleBeamFlux is not None else None
+        directImageFlux = h5_in.get(DirectFluxOverImagePath, default=None)
+        sampleImageFlux = h5_in.get(SampleFluxOverImagePath, default=None)
+        directImageFlux = directImageFlux[()] if directImageFlux is not None else None
+        sampleImageFlux = sampleImageFlux[()] if sampleImageFlux is not None else None
+
     if imageType == "direct_beam":
         directBeamFlux = ITotal_region / recordingTime
+        directImageFlux = ITotal_overall / recordingTime
     elif imageType == "sample_beam":
         sampleBeamFlux = ITotal_region / recordingTime
+        sampleImageFlux = ITotal_overall / recordingTime
 
     if directBeamFlux is not None and sampleBeamFlux is not None:
         transmission = sampleBeamFlux / directBeamFlux
+        transmission_image = sampleImageFlux / directImageFlux
         logging.info(f"Adding transmission factor to the file: {transmission}")
         TElements += [
             TranslationElement(
@@ -265,9 +441,68 @@ def main(
                 default_value=transmission,
                 destination_units="",
                 attributes={
-                    "note": "Determined by the beam_analysis post-translation processing script."
+                    "note": "Beam-based transmission factor by the beam_analysis post-translation processing script."
+                },
+            ),
+            TranslationElement(
+                # source is none since we're storing derived data
+                destination=ImageTransmissionOutPath,
+                minimum_dimensionality=1,
+                data_type="float32",
+                default_value=transmission_image,
+                destination_units="",
+                attributes={
+                    "note": "Image-based transmission factor, determined by the beam_analysis post-translation processing script."
+                },
+            ),
+            TranslationElement(
+                destination=TransmissionCorrectionFactorOutPath,
+                minimum_dimensionality=1,
+                data_type="float32",
+                default_value=transmission_image/transmission,
+                destination_units="",
+                attributes={
+                    "note": "Correction factor to multiply with beam transmission to get approximate true transmission, determined by the beam_analysis post-translation processing script, overwritten later by the value from the measurement with the closest detector position."
                 },
             )
+        ]
+
+    if sigma_minor is not None and sigma_major is not None and theta is not None:
+        logging.info("Adding beam profile parameters to the file.")
+        TElements += [
+            TranslationElement(
+                # source is none since we're storing derived data
+                destination=SigmaMinorOutPath,
+                minimum_dimensionality=1,
+                data_type="float32",
+                default_value=sigma_minor,
+                destination_units="px",
+                attributes={
+                    "note": "Minor sigma of the elliptical Gaussian fit to the beam profile, determined by the beam_analysis post-translation processing script."
+                },
+            ),
+            TranslationElement(
+                # source is none since we're storing derived data
+                destination=SigmaMajorOutPath,
+                minimum_dimensionality=1,
+                data_type="float32",
+                default_value=sigma_major,
+                destination_units="px",
+                attributes={
+                    "note": "Major sigma of the elliptical Gaussian fit to the beam profile, determined by the beam_analysis post-translation processing script."
+                },
+            ),
+            TranslationElement(
+                # source is none since we're storing derived data
+                destination=ThetaOutPath,
+                minimum_dimensionality=1,
+                data_type="float32",
+                default_value=theta,
+                destination_units="radians",
+                attributes={
+                    "note": "Angle of the major axis of the elliptical Gaussian fit to the beam profile (CCW from row axis), determined by the beam_analysis post-translation processing script."
+                },
+            ),
         ]
 
     # writing the resulting metadata back to the main HDF5 file
@@ -278,10 +513,7 @@ def main(
     logging.info("Post-translation processing complete.")
 
 
-### The code below probably does not need changing for use of the tremplate. ###
-
-
-
+# The code below probably does not need changing for use of the tremplate.
 def setup_argparser():
     """
     Sets up command line argument parser using argparse.

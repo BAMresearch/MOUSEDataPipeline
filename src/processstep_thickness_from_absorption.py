@@ -9,6 +9,7 @@ from logbook2mouse.logbook_reader import Logbook2MouseReader
 import logging
 from HDF5Translator.translator_elements import TranslationElement
 from HDF5Translator.translator import process_translation_element
+from utilities import get_float_from_h5, get_str_from_h5
 
 doc = """
 This processing step updates the metadata with the estimated thickness from the 
@@ -17,6 +18,7 @@ X-ray absorption and the X-ray absorption coefficient calculated from the compos
 
 # Flag indicating whether this process step can be executed in parallel on multiple repetitions
 can_process_repetitions_in_parallel = True
+
 
 def can_run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2MouseReader, logger: logging.Logger) -> bool:
     """
@@ -30,44 +32,33 @@ def can_run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2M
 
     return True
 
+
 def get_absorption(filename: Path, logger: logging.Logger) -> float:
     """
     Returns the absorption value from the file.
     """
-    try:
-        with h5py.File(filename, 'r') as h5f:
-            transmission = h5f['/entry1/sample/transmission'][()].mean()
-    except Exception as e:
-        logger.warning(f'could not read transmission from {filename} with error {e}')
-        return 0.0
-    if not isinstance(transmission, np.floating):
-        logger.warning(f'transmission not found in file {filename}')
-        return 0.0
-    if not (0 < transmission <= 1):
+    transmission = get_float_from_h5(filename, '/entry1/sample/transmission', logger)
+    # correct with the transmission_correction_factor if it exists
+    transmission_correction_factor = get_float_from_h5(filename, '/entry1/sample/transmission_correction_factor', logger)
+    if transmission_correction_factor and transmission_correction_factor > 1.0:
+        transmission *= transmission_correction_factor
+    if not (0.0 < transmission <= 1.0):
         logger.warning(f'transmission value {transmission} is not in the range [0, 1]')
         return 0.0
     return 1 - transmission
+
 
 def get_absorption_coefficient(filename: Path, logger: logging.Logger) -> float:
     """
     Returns the X-ray absorption coefficient (in 1/m) for the sample and energy from the file.
     """
-    try: 
-        with h5py.File(filename, 'r') as h5f:
-            absorption_coefficient = h5f['/entry1/sample/overall_mu'][()]
-        if isinstance(absorption_coefficient, list) or isinstance(absorption_coefficient, np.ndarray): 
-            absorption_coefficient = np.mean(absorption_coefficient)
-    except Exception as e:
-        logger.warning(f'could not read absorption coefficient from {filename} with error {e}')
-        return 0.0
     
-    if not isinstance(absorption_coefficient, np.floating):
-        logger.warning(f'absorption coefficient not found in file {filename}')
-        return 0.0
+    absorption_coefficient = get_float_from_h5(filename, '/entry1/sample/overall_mu', logger)
     if absorption_coefficient <= 0:
         logger.warning(f'absorption coefficient negative or zero in {filename}')
         return 0.0
     return absorption_coefficient
+
 
 def calculate_thickness(absorption_coefficient: float, absorption: float, logger: logging.Logger) -> float:
     """
@@ -82,18 +73,17 @@ def calculate_thickness(absorption_coefficient: float, absorption: float, logger
     thickness = -1 * np.log(1-absorption) / absorption_coefficient
     return thickness
 
+
 def get_background_file(filename: Path, logger: logging.Logger) -> Path:
     """
     Returns the background file for a given sample.
     """
-    with h5py.File(filename, 'r') as h5f:
-        if '/entry1/processing_required_metadata/background_file' in h5f:
-            background_file = h5f['/entry1/processing_required_metadata/background_file'][()].decode('utf-8')
-    
-    if Path(background_file).is_file():
+    background_file = get_str_from_h5(filename, '/entry1/processing_required_metadata/background_file', logger)
+    if background_file and Path(background_file).is_file():
         return Path(background_file)
     else:
         return None
+
 
 def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2MouseReader, logger: logging.Logger):
     """

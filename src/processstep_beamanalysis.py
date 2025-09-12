@@ -32,22 +32,19 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
         # python3 ../../src/tools/post_translation_operation_MOUSE_beamanalysis.py -f 20250101_17_0/testBAM_Dadd.nxs -v -k roi_size=25 image_type="sample_beam"
         # python3 ../../src/tools/post_translation_operation_MOUSE_beamanalysis.py -f 20250101_17_0/testBAM_Dadd.nxs -v -k roi_size=25 image_type="direct_beam"
 
-
         input_file = dir_path / f'MOUSE_{ymd}_{batch}_{repetition}.nxs'
         pto_file = defaults.post_translation_dir / 'post_translation_operation_MOUSE_beamanalysis.py'
+        # make sure to run direct_beam before sample_beam, as we need the beam mask from direct_beam. 
         cmd1 = [
             'python3', str(pto_file),
             '-f', str(input_file),
-            # '-v', 
-            '-k', 'roi_size=25', 'image_type=sample_beam',
+            '-k', 'image_type=direct_beam',
         ]
         cmd2 = [
             'python3', str(pto_file),
             '-f', str(input_file),
-            # '-v', 
-            '-k', 'roi_size=25', 'image_type=direct_beam',
+            '-k', 'image_type=sample_beam',
         ]
-
 
         logger.info(f"Starting beam analysis for {input_file}")
         result = subprocess.run(cmd1, check=True, capture_output=True, text=True)

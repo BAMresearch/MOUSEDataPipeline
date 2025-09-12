@@ -8,7 +8,7 @@ from defaults_carrier import DefaultsCarrier
 from logbook2mouse.logbook_reader import Logbook2MouseReader
 import logging
 
-from processstep_add_mask_file import get_configuration
+from utilities import get_configuration
 
 doc = """
 This processing step adds the stacked background files (whether they exist or not) for this measurement. 
@@ -17,6 +17,7 @@ Should be run after the metadata update step.
 
 # Flag indicating whether this process step can be executed in parallel on multiple repetitions
 can_process_repetitions_in_parallel = True
+
 
 def can_run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2MouseReader, logger: logging.Logger) -> bool:
     """
@@ -28,6 +29,7 @@ def can_run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2M
         logger.info(f"Background files adding not possible for {dir_path}, file missing at: {step_2_file}")
         return False
     return True
+
 
 def get_background_identifiers(filename: Path, logger: logging.Logger) -> Tuple[Union[str, None], Union[str, None]]:
     """
