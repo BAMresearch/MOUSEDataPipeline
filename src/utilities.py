@@ -10,11 +10,17 @@ def get_float_from_h5(filename: Path, HDFPath: str, logger: logging.Logger) -> f
     """
     Returns the value from the HDF5 file at HDFPath.
     """
-    try: 
+    try:
         with h5py.File(filename, 'r') as h5f:
             val = h5f[HDFPath][()]
-        if isinstance(val, list) or isinstance(val, np.ndarray): 
+        if isinstance(val, list) or isinstance(val, np.ndarray):
             val = np.mean(val)
+        else:
+            try:  # try to convert to float
+                val = np.float32(val)
+            except ValueError:
+                logger.warning(f'could not convert {val} from {HDFPath} in {filename} to float')
+                return 0.0
     except Exception as e:
         logger.warning(f'could not read absorption coefficient from {filename} with error {e}')
         return 0.0

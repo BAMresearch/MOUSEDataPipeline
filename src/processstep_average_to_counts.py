@@ -8,6 +8,7 @@ from defaults_carrier import DefaultsCarrier
 from logbook2mouse.logbook_reader import Logbook2MouseReader
 import logging
 from pint import UnitRegistry
+from utilities import get_float_from_h5
 
 # Initialize the unit registry
 ureg = UnitRegistry()
@@ -33,30 +34,6 @@ def can_run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2M
         return False
 
     return True
-
-
-def get_float_from_h5(filename: Path, HDFPath: str, logger: logging.Logger) -> float:
-    """
-    Returns the value from the HDF5 file at HDFPath.
-    """
-    try:
-        with h5py.File(filename, 'r') as h5f:
-            val = h5f[HDFPath][()]
-        if isinstance(val, list) or isinstance(val, np.ndarray): 
-            val = np.mean(val)
-        else:
-            try:
-                val = np.float32(val)
-            except ValueError:
-                logger.warning(f'could not convert {val} from {HDFPath} in {filename} to float')
-                return 0.0
-    except Exception as e:
-        logger.warning(f'could not read float from {filename} with error {e}')
-        return 0.0
-    if not isinstance(val, np.floating):
-        logger.warning(f'float at {HDFPath} not found in file {filename}, found {val}')
-        return 0.0
-    return val
 
 
 def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2MouseReader, logger: logging.Logger):
