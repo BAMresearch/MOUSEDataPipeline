@@ -38,10 +38,10 @@ def get_absorption(filename: Path, logger: logging.Logger) -> float:
     Returns the absorption value from the file.
     """
     transmission = get_float_from_h5(filename, '/entry1/sample/transmission', logger)
-    # correct with the transmission_correction_factor if it exists
-    transmission_correction_factor = get_float_from_h5(filename, '/entry1/sample/transmission_correction_factor', logger)
-    if transmission_correction_factor and transmission_correction_factor > 1.0:
-        transmission *= transmission_correction_factor
+    # correct with the transmission_correction_factor if it exists. Done separately in processstep_apply_transmission_correction_factor.py
+    # transmission_correction_factor = get_float_from_h5(filename, '/entry1/sample/transmission_correction_factor', logger)
+    # if transmission_correction_factor and transmission_correction_factor > 1.0:
+    #     transmission *= transmission_correction_factor
     if not (0.0 < transmission <= 1.0):
         logger.warning(f'transmission value {transmission} is not in the range [0, 1]')
         return 0.0
