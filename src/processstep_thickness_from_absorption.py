@@ -1,5 +1,6 @@
 from pathlib import Path
 import subprocess
+from typing import Union
 
 import h5py
 import numpy as np
@@ -33,33 +34,6 @@ def can_run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2M
     return True
 
 
-def get_absorption(filename: Path, logger: logging.Logger) -> float:
-    """
-    Returns the absorption value from the file.
-    """
-    transmission = get_float_from_h5(filename, '/entry1/sample/transmission', logger)
-    # correct with the transmission_correction_factor if it exists. Done separately in processstep_apply_transmission_correction_factor.py
-    # transmission_correction_factor = get_float_from_h5(filename, '/entry1/sample/transmission_correction_factor', logger)
-    # if transmission_correction_factor and transmission_correction_factor > 1.0:
-    #     transmission *= transmission_correction_factor
-    if not (0.0 < transmission <= 1.0):
-        logger.warning(f'transmission value {transmission} is not in the range [0, 1]')
-        return 0.0
-    return 1 - transmission
-
-
-def get_absorption_coefficient(filename: Path, logger: logging.Logger) -> float:
-    """
-    Returns the X-ray absorption coefficient (in 1/m) for the sample and energy from the file.
-    """
-    
-    absorption_coefficient = get_float_from_h5(filename, '/entry1/sample/overall_mu', logger)
-    if absorption_coefficient <= 0:
-        logger.warning(f'absorption coefficient negative or zero in {filename}')
-        return 0.0
-    return absorption_coefficient
-
-
 def calculate_thickness(absorption_coefficient: float, absorption: float, logger: logging.Logger) -> float:
     """
     Calculates the thickness of the sample from the absorption and the absorption coefficient.
@@ -74,11 +48,14 @@ def calculate_thickness(absorption_coefficient: float, absorption: float, logger
     return thickness
 
 
-def get_background_file(filename: Path, logger: logging.Logger) -> Path:
+def get_background_file(filename: Path, logger: logging.Logger) -> Union[Path, None]:
     """
     Returns the background file for a given sample.
     """
     background_file = get_str_from_h5(filename, '/entry1/processing_required_metadata/background_file', logger)
+    # make it relative to the current file
+    if background_file:
+        background_file = (filename.parent / background_file).resolve()
     if background_file and Path(background_file).is_file():
         return Path(background_file)
     else:
@@ -91,26 +68,38 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
     """
     ymd, batch, repetition = extract_metadata_from_path(dir_path)
     input_file = dir_path / f'MOUSE_{ymd}_{batch}_{repetition}.nxs'
+    assert input_file.is_file(), f"Input file {input_file} does not exist"
+
     try:
         logger.info(f"Starting thickness_from_absorption step for {input_file}")
-        absorption_coefficient = get_absorption_coefficient(input_file, logger)
-        absorption = get_absorption(input_file, logger)
+        absorption_coefficient = get_float_from_h5(input_file, HDFPath='/entry1/sample/overall_mu', logger=logger)
+        if absorption_coefficient <= 0:
+            logger.warning(f'absorption coefficient negative or zero in {input_file}, cannot calculate thickness')
+            return
+        transmission = get_float_from_h5(input_file, HDFPath='/entry1/sample/transmission', logger=logger)
+        absorption = 1 - transmission
         # we also need to get the absorption from the background file if it exists: 
         background_file = get_background_file(input_file, logger)
+
         absorption_bg = 0
         absorption_sample = absorption
         if background_file:
-            if input_file.stem[:-4] == background_file.stem[:-4]:
+            bg_ymd, bg_batch, _ = background_file.stem.split('_')[1:4]
+            if (batch == bg_batch) and (ymd == bg_ymd):
                 logger.warning(f"Sample and background file are the same: {input_file} and {background_file}")
                 logger.warning(f"Not correcting for background transmission")
             else:
-                absorption_bg = get_absorption(background_file, logger)
-                absorption_sample = 1-(1-absorption)/(1-absorption_bg)
+                # we can get the mean from the stacked background file
+                transmission_bg = get_float_from_h5(background_file, HDFPath='/entry1/sample/transmission_mean', logger=logger)
+                transmission_sample = transmission / transmission_bg if transmission_bg > 0 else transmission
+                absorption_sample = 1-transmission_sample
                 if not(0 < absorption_sample < 1):
                     logger.warning(f"Sample-specific absorption {absorption_sample} outside of realistic limits. total absorption: {absorption}, background absorption: {absorption_bg}. resetting to {absorption}")
+                    absorption_sample = absorption
+                
         thickness = calculate_thickness(absorption_coefficient, absorption_sample, logger)
 
-                # This class lets you configure exactly what the output should look like in the HDF5 file.
+        # This class lets you configure exactly what the output should look like in the HDF5 file.
         TElements = []  # we want to add two elements, so I make a list
         TElements += [
             TranslationElement(
