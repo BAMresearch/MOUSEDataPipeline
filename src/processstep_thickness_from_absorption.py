@@ -56,6 +56,7 @@ def get_background_file(filename: Path, logger: logging.Logger) -> Union[Path, N
     # make it relative to the current file
     if background_file:
         background_file = (filename.parent / background_file).resolve()
+    # print(f' * * * Found background file {background_file} for sample file {filename}')
     if background_file and Path(background_file).is_file():
         return Path(background_file)
     else:
@@ -80,7 +81,7 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
         absorption = 1 - transmission
         # we also need to get the absorption from the background file if it exists: 
         background_file = get_background_file(input_file, logger)
-
+        # print(f' * * * Found background file {background_file} for sample file {input_file}')
         absorption_bg = 0
         absorption_sample = absorption
         if background_file:
@@ -91,6 +92,7 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
             else:
                 # we can get the mean from the stacked background file
                 transmission_bg = get_float_from_h5(background_file, HDFPath='/entry1/sample/transmission_mean', logger=logger)
+                # print(f' * * * Found background file {background_file} with transmission {transmission_bg} for sample file {input_file} with transmission {transmission}')
                 transmission_sample = transmission / transmission_bg if transmission_bg > 0 else transmission
                 absorption_sample = 1-transmission_sample
                 if not(0 < absorption_sample < 1):
@@ -98,6 +100,7 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
                     absorption_sample = absorption
                 
         thickness = calculate_thickness(absorption_coefficient, absorption_sample, logger)
+        print(f' * * * Calculated thickness {thickness} m from absorption {absorption} (sample absorption {absorption_sample} and background absorption {absorption_bg}) and absorption coefficient {absorption_coefficient} 1/m for file {input_file})')
 
         # This class lets you configure exactly what the output should look like in the HDF5 file.
         TElements = []  # we want to add two elements, so I make a list
