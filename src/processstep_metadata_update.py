@@ -134,10 +134,8 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
         if (entry.dbgdate is not None) and (entry.dbgnumber is not None):
             dbgymd = f'{entry.dbgdate.year}{entry.dbgdate.month:02d}{entry.dbgdate.day:02d}'
             dbg_identifier = f'{dbgymd}_{entry.dbgnumber}'
-        else: 
+        else:
             dbg_identifier = 'None'
-
-        # print(f'* * * * * * * * {entry.sample.calculate_overall_properties(energy)['overall_mu']=} * * * * * * * * ')
 
         TElements += [
             TranslationElement(
@@ -154,12 +152,24 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
                 # source is none since we're storing derived data
                 destination='/entry1/sample/matrixfraction',
                 minimum_dimensionality=1,
-                data_type="string",
+                data_type="float",
                 default_value=entry.matrixfraction,
                 attributes={
                     "note": "The volume fraction that the matrix takes up in the total sample. For dilute samples, this approaches 1.0"
                 },
-            ),   
+            ),
+            TranslationElement(
+                # source is none since we're storing derived data
+                destination='/entry1/sample/samplethickness',
+                minimum_dimensionality=1,
+                data_type="float",
+                default_value=entry.samplethickness,
+                attributes={
+                    "note": "The thickness of the sample as specified in the measurement logbook in meters.",
+                },
+                source_units='m',
+                destination_units='m',
+            ),
             TranslationElement(
                 destination='/entry1/sample/overall_mu',
                 minimum_dimensionality=1,
