@@ -66,7 +66,7 @@ def reduce_extra_image_dimensions(image:np.ndarray, method=np.mean)->np.ndarray:
     return image
 
 
-def new_beam_analysis(imageData: np.ndarray, coverage: float = 0.90, ellipse_mask:Optional[np.ndarray] = None) -> Union[tuple, float, np.ndarray]:
+def new_beam_analysis(imageData: np.ndarray, coverage: float = 0.99994, ellipse_mask:Optional[np.ndarray] = None) -> Union[tuple, float, np.ndarray]:
     
     def _ellipse_mask_from_regionprops(
             reg: measure._regionprops.RegionProperties,
@@ -315,7 +315,7 @@ def main(
     # center_of_mass, ITotal_region = beam_analysis(imageData, ROI_SIZE)
     center_of_mass, ITotal_region, ITotal_overall, ellipse_mask, sigma_minor, sigma_major, theta = new_beam_analysis(
         imageData,
-        coverage=0.90,
+        coverage=0.99994,
         ellipse_mask=ellipse_mask
         )
     logging.info(
