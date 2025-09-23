@@ -8,8 +8,8 @@ from YMD_class import extract_metadata_from_path
 from defaults_carrier import DefaultsCarrier
 from logbook2mouse.logbook_reader import Logbook2MouseReader
 import logging
-from HDF5Translator.translator_elements import TranslationElement
-from HDF5Translator.translator import process_translation_element
+from HDF5Translator.translator_elements import TranslationElement, LinkElement
+from HDF5Translator.translator import process_translation_element, process_link_element
 from utilities import get_float_from_h5, get_str_from_h5
 
 doc = """
@@ -73,6 +73,7 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
 
     try:
         logger.info(f"Starting thickness_from_absorption step for {input_file}")
+        # collect absorption coefficient and transmission factor from the file
         absorption_coefficient = get_float_from_h5(input_file, HDFPath='/entry1/sample/overall_mu', logger=logger)
         if absorption_coefficient <= 0:
             logger.warning(f'absorption coefficient negative or zero in {input_file}, cannot calculate thickness')
@@ -81,7 +82,8 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
         absorption = 1 - transmission
         # we also need to get the absorption from the background file if it exists: 
         background_file = get_background_file(input_file, logger)
-        # print(f' * * * Found background file {background_file} for sample file {input_file}')
+
+        # get the transmission from the background file if we can, to later isolate the absorption from the sample only
         absorption_bg = 0
         absorption_sample = absorption
         if background_file:
@@ -92,17 +94,18 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
             else:
                 # we can get the mean from the stacked background file
                 transmission_bg = get_float_from_h5(background_file, HDFPath='/entry1/sample/transmission_mean', logger=logger)
-                # print(f' * * * Found background file {background_file} with transmission {transmission_bg} for sample file {input_file} with transmission {transmission}')
+                # here we assume that the background absorption is only due to the container
                 transmission_sample = transmission / transmission_bg if transmission_bg > 0 else transmission
                 absorption_sample = 1-transmission_sample
                 if not(0 < absorption_sample < 1):
                     logger.warning(f"Sample-specific absorption {absorption_sample} outside of realistic limits. total absorption: {absorption}, background absorption: {absorption_bg}. resetting to {absorption}")
                     absorption_sample = absorption
-                
-        thickness = calculate_thickness(absorption_coefficient, absorption_sample, logger)
-        print(f' * * * Calculated thickness {thickness} m from absorption {absorption} (sample absorption {absorption_sample} and background absorption {absorption_bg}) and absorption coefficient {absorption_coefficient} 1/m for file {input_file})')
 
-        # This class lets you configure exactly what the output should look like in the HDF5 file.
+        # Calculate the thickness from the absorption data
+        thickness = calculate_thickness(absorption_coefficient, absorption_sample, logger)
+        logging.info(f'Calculated {thickness=:0.03e} m from {absorption=:0.03e} ({absorption_sample=:0.03e} and background absorption {absorption_bg=:0.03e} from {background_file=}) and {absorption_coefficient=:0.03e} 1/m for file {input_file})')
+
+        # Now let's store all that information in the HDF5 file. 
         TElements = []  # we want to add two elements, so I make a list
         TElements += [
             TranslationElement(
@@ -160,10 +163,55 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
             for element in TElements:  # iterate over the two elements and write them back
                 process_translation_element(None, h5_out, element)
 
+        # lastly select the appropriate thickness to be used in the calculations:
+        # if the thickness specified in the logbook is negative, we use the absorption-derived thickness,
+        # but if it is positive, we use the logbook-specified thickness
+        # we set the /entry1/sample/thickness to /entry1/sample/samplethickness if not negative, else set to absorptionDerivedThickness
+        samplethickness = get_float_from_h5(input_file, HDFPath='/entry1/sample/samplethickness', logger=logger)
+        if samplethickness <= 0:
+            logger.info(f'setting samplethickness to absorptionDerivedThickness since logbook-specified samplethickness was {samplethickness}')
+
+            TE = TranslationElement(
+                # source is none since we're storing derived data
+                destination="/entry1/sample/thickness",
+                minimum_dimensionality=1,
+                data_type="float32",
+                default_value=thickness,
+                source_units="m",
+                destination_units="m",
+                attributes={
+                    "note": "Set to absorptionDerivedThickness since logbook-specified samplethickness was negative or zero. Determined by the processstep_thickness_from_absorption post-translation processing script."
+                },
+            )
+            # "/entry1 /sample/absorptionDerivedThickness"
+
+            # LE = LinkElement(
+            #     source_path="/entry1/sample/absorptionDerivedThickness",
+            #     destination_path="/entry1/sample/thickness",
+            #     soft_or_hard_link="hard",
+            # )
+        else:
+            logger.info(f'keeping logbook-specified samplethickness {samplethickness} since it was positive')
+            TE = TranslationElement(
+                # source is none since we're storing derived data
+                destination="/entry1/sample/thickness",
+                minimum_dimensionality=1,
+                data_type="float32",
+                default_value=samplethickness,
+                source_units="m",
+                destination_units="m",
+                attributes={
+                    "note": "Set to logbook-specified samplethickness since it was positive. Determined by the processstep_thickness_from_absorption post-translation processing script."
+                },
+            )
+        with h5py.File(input_file, "r+") as h5_out:
+            process_translation_element(None, h5_out, TE)
+        # with h5py.File(input_file, "a") as h5_out:
+        #     process_link_element(None, h5_out, LE)
+
         logger.info(f"Completed thickness_from_absorption step for {input_file}, {absorption=}, {absorption_bg=}. {absorption_sample=}, {absorption_coefficient=}, {thickness=}")
     except Exception as e:
         # Print the standard output and standard error
         logger.info("thickness_from_absorption step failed with error:")
         logger.info(e)
         logger.error(f"Error during thickness_from_absorption step: {e}")
-
