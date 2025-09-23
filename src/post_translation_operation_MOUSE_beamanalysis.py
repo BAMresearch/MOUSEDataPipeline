@@ -60,13 +60,13 @@ You can replace the calculation and file read/write logic according to your spec
 
 
 def reduce_extra_image_dimensions(image:np.ndarray, method=np.mean)->np.ndarray:
-    assert method in [np.mean, np.sum], "method must be either np.mean or np.sum function handles"
+    assert method in [np.mean, np.sum, np.any, np.all], "method must be either np.mean or np.sum function handles"
     while image.ndim > 2:
         image = method(image, axis=0)
     return image
 
 
-def new_beam_analysis(imageData: np.ndarray, coverage: float = 0.99, ellipse_mask:Optional[np.ndarray] = None) -> Union[tuple, float, np.ndarray]:
+def new_beam_analysis(imageData: np.ndarray, coverage: float = 0.997, ellipse_mask:Optional[np.ndarray] = None) -> Union[tuple, float, np.ndarray]:
     
     def _ellipse_mask_from_regionprops(
             reg: measure._regionprops.RegionProperties,
@@ -298,10 +298,13 @@ def main(
         recordingTime = h5_in[BeamDurationPath][()]
         # read the beam mask if it exists (for sample beam analysis), otherwise None
         ellipse_mask = h5_in.get(BeamMaskPath, default=None)
-        ellipse_mask = ellipse_mask[()] if ellipse_mask is not None else None
-        # ellipse_mask = None
-        # if BeamMaskPath in h5_in:
-        #     ellipse_mask = h5_in[BeamMaskPath][()]
+        # reduce dimensions if needed
+        if ellipse_mask is not None:
+            ellipse_mask = ellipse_mask[()]
+            ellipse_mask = reduce_extra_image_dimensions(ellipse_mask, method=np.any)
+        else:
+            ellipse_mask = None
+
     if imageType == "sample_beam":
         assert ellipse_mask is not None, "For sample_beam analysis, the beam mask must be provided from the direct_beam analysis."
 
@@ -312,7 +315,7 @@ def main(
     # center_of_mass, ITotal_region = beam_analysis(imageData, ROI_SIZE)
     center_of_mass, ITotal_region, ITotal_overall, ellipse_mask, sigma_minor, sigma_major, theta = new_beam_analysis(
         imageData,
-        coverage=0.99,
+        coverage=0.997,
         ellipse_mask=ellipse_mask
         )
     logging.info(
@@ -325,7 +328,7 @@ def main(
         TranslationElement(
             # source is none since we're storing derived data
             destination=BeamMaskPath,
-            minimum_dimensionality=2,
+            minimum_dimensionality=3,
             data_type="float32",
             default_value=ellipse_mask,
             source_units="px",
