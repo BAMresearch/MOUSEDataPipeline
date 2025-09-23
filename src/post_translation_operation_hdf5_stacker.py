@@ -227,6 +227,7 @@ class newNewConcat(object):
             for path in self.stackItems:
                 if path in h5in and path in h5out:
                     logging.debug(f'adding data to stack: {path} at stackLocation: {addAtStackLocation}')
+                    # print(f'adding data to stack: {path} at stackLocation: {addAtStackLocation}')
                     h5out[path][addAtStackLocation] = h5in[path][()]            
                 elif not path in h5in:
                     logging.warning(f'** could not find path {path} in input file,. skipping...')
