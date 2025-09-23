@@ -43,9 +43,18 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
         ymd, batch, repetition = extract_metadata_from_path(dir_path)
         input_file = dir_path / f'MOUSE_{ymd}_{batch}_{repetition}.nxs'
 
-        # copy the old transmission value to a new field transmission_beam
+        # copy the old transmission value to a new field transmission_beam using TranslationElement
         with h5py.File(input_file, "r+") as h5_out:
-            h5_out['/entry1/sample/transmission_beam'] = h5_out['/entry1/sample/transmission'][...]
+            TE = TranslationElement(
+                destination='/entry1/sample/transmission_beam',
+                data_type="float",
+                minimum_dimensionality=1,
+                default_value=h5_out['/entry1/sample/transmission'][...],
+                attributes={
+                    "note": "Beam transmission value (without correction for scattered/diffracted photons). Determined by the beam_analysis post-translation processing script",
+                },
+            )
+            process_translation_element(None, h5_out, TE)
 
         transmission = get_float_from_h5(input_file, '/entry1/sample/transmission', logger)
         transmission_correction_factor = get_float_from_h5(input_file, '/entry1/sample/transmission_correction_factor', logger)
