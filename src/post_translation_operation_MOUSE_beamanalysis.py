@@ -15,7 +15,7 @@ Replace the calculation and file read/write logic according to your specific req
 
 This example determines a beam center, transmission and flux from a beamstopless measurement.
 The path can be specified on the command line, meaning the same operation can be used on the 
-direct beam measurement as well as the sample beam measurement. The ROI size can be specified. 
+direct beam measurement as well as the sample beam measurement. 
 
 This is an operation which is normally done in the MOUSE procedure
 requires scikit-image
@@ -53,11 +53,6 @@ the option of supplying key-value pairs for additional parameters to your operat
 You can replace the calculation and file read/write logic according to your specific requirements.
 """
 
-# def hdf5_get_image(filename: Path, h5imagepath: str = "entry/data/data") -> np.ndarray:
-#     with h5py.File(filename, "r") as h5f:
-#         image = h5f[h5imagepath][()]
-#     return image
-
 
 def reduce_extra_image_dimensions(image:np.ndarray, method=np.mean)->np.ndarray:
     assert method in [np.mean, np.sum, np.any, np.all], "method must be either np.mean or np.sum function handles"
@@ -66,7 +61,7 @@ def reduce_extra_image_dimensions(image:np.ndarray, method=np.mean)->np.ndarray:
     return image
 
 
-def new_beam_analysis(imageData: np.ndarray, coverage: float = 0.99994, ellipse_mask:Optional[np.ndarray] = None) -> Union[tuple, float, np.ndarray]:
+def new_beam_analysis(imageData: np.ndarray, coverage: float = 0.997, ellipse_mask:Optional[np.ndarray] = None) -> Union[tuple, float, np.ndarray]:
     
     def _ellipse_mask_from_regionprops(
             reg: measure._regionprops.RegionProperties,
@@ -129,7 +124,7 @@ def new_beam_analysis(imageData: np.ndarray, coverage: float = 0.99994, ellipse_
             steps:int=8
             ) -> float:
         """
-            Real peaks deviate from perfect Gaussians. This 10-line bisection nudges k
+            Real peaks deviate from perfect Gaussians. This bisection nudges k
             so the integrated fraction over your peak matches the target: - GPT code
         """
         total = float(img[base_mask].sum())
@@ -152,7 +147,7 @@ def new_beam_analysis(imageData: np.ndarray, coverage: float = 0.99994, ellipse_
     maskedTwoDImage = imageData * labeled_foreground  # apply mask
     sigma_minor, sigma_major, theta = None, None, None
     if ellipse_mask is not None:
-        assert ellipse_mask.shape == imageData.shape, "Provided ellipse_mask must have the same shape as imageData"
+        assert ellipse_mask.shape == maskedTwoDImage.shape, "Provided ellipse_mask must have the same shape as imageData"
         ellipse_mask = ellipse_mask.astype(int)
     else:
         threshold_value = np.maximum(
@@ -191,14 +186,14 @@ def new_beam_analysis(imageData: np.ndarray, coverage: float = 0.99994, ellipse_
         assert np.unique(labels).size == 2, "More than one labeled region found."
 
         # step 4: calculate region properties
-        properties = regionprops(labels, imageData)  # calculate region properties
+        properties = regionprops(labels, maskedTwoDImage)  # calculate region properties
 
         # GPT addition:
         # --- NEW: shrink the region to desired intensity coverage (e.g., 95%) ---
         coverage_target = coverage
         ellipse_mask, md2, sigma_minor, sigma_major, theta = _ellipse_mask_from_regionprops(
             properties[0],
-            imageData.shape,
+            maskedTwoDImage.shape,
             coverage_target
             )
         # Keep the ellipse inside the original label to avoid bleeding into neighbors
@@ -211,7 +206,7 @@ def new_beam_analysis(imageData: np.ndarray, coverage: float = 0.99994, ellipse_
         print(f"Refined k={k:.3f} to achieve coverage {achieved_coverage:.4f} ({coverage_target=})")
         ellipse_mask = ellipse_mask.astype(int)
 
-    properties = regionprops(ellipse_mask, imageData)  # calculate region properties
+    properties = regionprops(ellipse_mask, maskedTwoDImage)  # calculate region properties
     # continue normally if beam found
     # center_of_mass = properties[0].centroid  # center of mass (unweighted by intensity)
     weighted_center_of_mass = properties[0].weighted_centroid  # center of mass (weighted)
@@ -315,7 +310,7 @@ def main(
     # center_of_mass, ITotal_region = beam_analysis(imageData, ROI_SIZE)
     center_of_mass, ITotal_region, ITotal_overall, ellipse_mask, sigma_minor, sigma_major, theta = new_beam_analysis(
         imageData,
-        coverage=0.99994,
+        coverage=0.997,
         ellipse_mask=ellipse_mask
         )
     logging.info(
