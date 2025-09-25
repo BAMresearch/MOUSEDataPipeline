@@ -39,6 +39,7 @@ from HDF5Translator.utils.configure_logging import configure_logging
 from HDF5Translator.translator_elements import TranslationElement
 from HDF5Translator.translator import process_translation_element
 from HDF5Translator.utils.data_utils import getFromKeyVals
+from utilities import reduce_extra_image_dimensions, prepare_eiger_image
 
 description = """
 This script is an example on how to perform post-translation operations on HDF5 files.
@@ -52,13 +53,6 @@ the option of supplying key-value pairs for additional parameters to your operat
 
 You can replace the calculation and file read/write logic according to your specific requirements.
 """
-
-
-def reduce_extra_image_dimensions(image:np.ndarray, method=np.mean)->np.ndarray:
-    assert method in [np.mean, np.sum, np.any, np.all], "method must be either np.mean or np.sum function handles"
-    while image.ndim > 2:
-        image = method(image, axis=0)
-    return image
 
 
 def new_beam_analysis(imageData: np.ndarray, coverage: float = 0.997, ellipse_mask:Optional[np.ndarray] = None) -> Union[tuple, float, np.ndarray]:
@@ -143,8 +137,7 @@ def new_beam_analysis(imageData: np.ndarray, coverage: float = 0.997, ellipse_ma
 
     # if we don't have a mask yet, we need to determine one (for direct_beam only. sample_beam should use the direct beam mask)
     # Step 1: get rid of masked or pegged pixels on an Eiger detector
-    labeled_foreground = (np.logical_and(imageData >= 0, imageData <= 2e7)).astype(int)
-    maskedTwoDImage = imageData * labeled_foreground  # apply mask
+    maskedTwoDImage = prepare_eiger_image(imageData, logging.getLogger())
     sigma_minor, sigma_major, theta = None, None, None
     if ellipse_mask is not None:
         assert ellipse_mask.shape == maskedTwoDImage.shape, "Provided ellipse_mask must have the same shape as imageData"
