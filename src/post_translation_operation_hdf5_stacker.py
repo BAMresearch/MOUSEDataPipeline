@@ -47,7 +47,7 @@ def canStack(filename:Path)->bool:
         "entry1/sample/transmission", # beam analysis with both beams is there
 
         "entry1/processing/direct_beam_profile/beam_analysis/centerOfMass",        
-        "entry1/processing/sample_beam_profile/beam_analysis/centerOfMass",        
+        # "entry1/processing/sample_beam_profile/beam_analysis/centerOfMass",        
     ]
     # check that the filenames referenced in these paths exist:
     checkFileExistence = [
@@ -121,7 +121,7 @@ class newNewConcat(object):
 
         # add the datasets to the file.. this could perhaps be done in parallel
         for idx, filename in enumerate(filenames): 
-            print(f'adding file {idx+1} of {len(filenames)}: {filename}')
+            # print(f'adding file {idx+1} of {len(filenames)}: {filename}')
             self.addDataToStack(filename, addAtStackLocation = idx)
 
         # now we calculate the mean, std and standard error on the mean of selected datasets:

@@ -2,20 +2,8 @@
 # coding: utf-8
 
 """
-Post-Translation HDF5 Processor
-
-This script performs post-translation steps on HDF5 files, including reading information,
-performing calculations (e.g. for determining beam centers, transmission factors and other 
-derived information), and writes the result back into the HDF5 structure of the original file.
-
-Usage:
-    python post_translation_processor.py --input measurement.h5 [--auxiliary_files file2.h5 ...] [-v]
-
-Replace the calculation and file read/write logic according to your specific requirements.
-
-This example determines a beam center, transmission and flux from a beamstopless measurement.
-The path can be specified on the command line, meaning the same operation can be used on the 
-direct beam measurement as well as the sample beam measurement. 
+This example determines a beam center from a beamstopless, direct beam measurement.
+This is used in subsequent steps for determining beam transmission factors. 
 
 This is an operation which is normally done in the MOUSE procedure
 requires scikit-image
@@ -39,7 +27,7 @@ from HDF5Translator.utils.configure_logging import configure_logging
 from HDF5Translator.translator_elements import TranslationElement
 from HDF5Translator.translator import process_translation_element
 from HDF5Translator.utils.data_utils import getFromKeyVals
-from utilities import reduce_extra_image_dimensions, prepare_eiger_image
+from utilities import label_main_feature, reduce_extra_image_dimensions, prepare_eiger_image
 
 description = """
 This script is an example on how to perform post-translation operations on HDF5 files.
@@ -55,8 +43,8 @@ You can replace the calculation and file read/write logic according to your spec
 """
 
 
-def new_beam_analysis(imageData: np.ndarray, coverage: float = 0.997, ellipse_mask:Optional[np.ndarray] = None) -> Union[tuple, float, np.ndarray]:
-    
+def determine_beam_center(imageData: np.ndarray, coverage: float = 0.997) -> Union[tuple, float, np.ndarray]:
+
     def _ellipse_mask_from_regionprops(
             reg: measure._regionprops.RegionProperties,
             shape,
@@ -131,53 +119,20 @@ def new_beam_analysis(imageData: np.ndarray, coverage: float = 0.997, ellipse_ma
                 k_hi = k_mid
         return 0.5*(k_lo + k_hi)
 
-
-    # Now you can do operations, such as determining a beam center and flux. For that, we need to
+    # Now we can do operations, such as determining a beam center. For that, we need to
     # do a few steps...
 
-    # if we don't have a mask yet, we need to determine one (for direct_beam only. sample_beam should use the direct beam mask)
+    # if we don't have a mask yet, we need to determine one (for direct_beam only)
     # Step 1: get rid of masked or pegged pixels on an Eiger detector
+
     maskedTwoDImage = prepare_eiger_image(imageData, logging.getLogger())
     sigma_minor, sigma_major, theta = None, None, None
     if ellipse_mask is not None:
-        assert ellipse_mask.shape == maskedTwoDImage.shape, "Provided ellipse_mask must have the same shape as imageData"
+        assert ellipse_mask.shape == imageData.shape, "Provided ellipse_mask must have the same shape as imageData"
         ellipse_mask = ellipse_mask.astype(int)
     else:
-        threshold_value = np.maximum(
-            1, 1*maskedTwoDImage.mean() # 0.0001 * maskedTwoDImage.max()
-        )  # filters.threshold_otsu(maskedTwoDImage) # ignore zero pixels
-        # print(f'{threshold_value=}')
-
-        # Step 1: binary mask of "candidate bright regions"
-        mask = maskedTwoDImage > threshold_value
-
-        # Step 2: label connected components
-        # labels = measure.label(mask, connectivity=2)
-        labels, num = measure.label(
-            morphology.convex_hull_image(  # we expect the beam to be convex
-                morphology.remove_small_holes(  # with moly we may see small dead pixels in the beam
-                    morphology.remove_small_objects(  # we don't care about isolated spikes
-                        mask,
-                        min_size=20
-                        ),
-                    area_threshold=20
-                    ),
-                ),
-            connectivity=1,
-            return_num=True
-            )
-
-        # Step 3: ensure we only have the main feature
-        if num == 0:
-            raise ValueError("No beam found in the image.")
-        if num > 1:
-            print("Multiple beams found in the image, selecting the largest one.")
-            # find the largest component and keep only that one
-            largest_label = np.argmax(np.bincount(labels.flat)[1:]) + 1  # skip background label 0
-            labels = (labels == largest_label).astype(int)
-        # assert we only have one labeled region now
-        assert np.unique(labels).size == 2, "More than one labeled region found."
-
+        # create label: 
+        labels = label_main_feature(maskedTwoDImage, logging.getLogger())
         # step 4: calculate region properties
         properties = regionprops(labels, maskedTwoDImage)  # calculate region properties
 
@@ -301,7 +256,7 @@ def main(
     # Now you can do operations, such as determining a beam center and flux. For that, we need to
     # do a few steps...
     # center_of_mass, ITotal_region = beam_analysis(imageData, ROI_SIZE)
-    center_of_mass, ITotal_region, ITotal_overall, ellipse_mask, sigma_minor, sigma_major, theta = new_beam_analysis(
+    center_of_mass, ITotal_region, ITotal_overall, ellipse_mask, sigma_minor, sigma_major, theta = determine_beam_center(
         imageData,
         coverage=0.997,
         ellipse_mask=ellipse_mask
@@ -401,65 +356,8 @@ def main(
             ),
         ]
 
-    # find out if we have enough information to calcuate the transmission factor:
-    with h5py.File(filename, "r") as h5_in:
-        directBeamFlux = h5_in.get(DirectFluxOutPath, default=None)
-        sampleBeamFlux = h5_in.get(SampleFluxOutPath, default=None)
-        directBeamFlux = directBeamFlux[()] if directBeamFlux is not None else None
-        sampleBeamFlux = sampleBeamFlux[()] if sampleBeamFlux is not None else None
-        directImageFlux = h5_in.get(DirectFluxOverImagePath, default=None)
-        sampleImageFlux = h5_in.get(SampleFluxOverImagePath, default=None)
-        directImageFlux = directImageFlux[()] if directImageFlux is not None else None
-        sampleImageFlux = sampleImageFlux[()] if sampleImageFlux is not None else None
-
-    if imageType == "direct_beam":
-        directBeamFlux = ITotal_region / recordingTime
-        directImageFlux = ITotal_overall / recordingTime
-    elif imageType == "sample_beam":
-        sampleBeamFlux = ITotal_region / recordingTime
-        sampleImageFlux = ITotal_overall / recordingTime
-
-    if directBeamFlux is not None and sampleBeamFlux is not None:
-        transmission = sampleBeamFlux / directBeamFlux
-        transmission_image = sampleImageFlux / directImageFlux
-        logging.info(f"Adding transmission factor to the file: {transmission}")
-        TElements += [
-            TranslationElement(
-                # source is none since we're storing derived data
-                destination=TransmissionOutPath,
-                minimum_dimensionality=1,
-                data_type="float32",
-                default_value=transmission,
-                destination_units="",
-                attributes={
-                    "note": "Beam-based transmission factor by the beam_analysis post-translation processing script."
-                },
-            ),
-            TranslationElement(
-                # source is none since we're storing derived data
-                destination=ImageTransmissionOutPath,
-                minimum_dimensionality=1,
-                data_type="float32",
-                default_value=transmission_image,
-                destination_units="",
-                attributes={
-                    "note": "Image-based transmission factor, determined by the beam_analysis post-translation processing script."
-                },
-            ),
-            TranslationElement(
-                destination=TransmissionCorrectionFactorOutPath,
-                minimum_dimensionality=1,
-                data_type="float32",
-                default_value=transmission_image/transmission,
-                destination_units="",
-                attributes={
-                    "note": "Correction factor to multiply with beam transmission to get approximate true transmission, determined by the beam_analysis post-translation processing script, overwritten later by the value from the measurement with the closest detector position."
-                },
-            )
-        ]
-
     if sigma_minor is not None and sigma_major is not None and theta is not None:
-        logging.info("Adding beam profile parameters to the file.")
+        logging.info("Adding beam center parameters to the file.")
         TElements += [
             TranslationElement(
                 # source is none since we're storing derived data

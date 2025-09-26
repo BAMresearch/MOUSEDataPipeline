@@ -36,7 +36,6 @@ def processing_needed_for_config(dir_path: Path, ymd: YMD, batch: str, config: s
         logger.info(f"Processed file {latest_processed_file} is newer than stacked file, processing needed for {dir_path}")
         return True
     
-    # default
     return False
 
 

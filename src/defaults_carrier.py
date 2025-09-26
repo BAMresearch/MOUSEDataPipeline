@@ -127,4 +127,4 @@ def create_defaults_carrier_from_config(config_file: Optional[str] = None) -> De
 if __name__ == '__main__':
     # Example: Loading from a YAML configuration
     defaults = create_defaults_carrier_from_config("MOUSE_settings.yaml")
-    print(defaults.data_dir)
+    # print(defaults.data_dir)
