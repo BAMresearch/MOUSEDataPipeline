@@ -21,6 +21,10 @@ class YMD:
     def __repr__(self):
         # return the YMD string
         return f"{self.YMD}"
+    
+    def as_int(self) -> int:
+        # Convert and return the YMD string as an integer
+        return int(self.YMD)
 
     def get_year(self) -> str:
         # Extract and return the year from the YMD string

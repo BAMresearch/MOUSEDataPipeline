@@ -176,7 +176,7 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
                 data_type="float",
                 default_value=entry.sample.calculate_overall_properties(energy)['overall_mu'],
                 attributes={
-                    "note": "The volume fraction that the matrix takes up in the total sample. For dilute samples, this approaches 1.0",
+                    "note": "The computed x-ray linear attenuation coefficient of the sample at the measurement energy.",
                 },
                 source_units='1/m',
                 destination_units='1/m'

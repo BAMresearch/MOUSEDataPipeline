@@ -87,7 +87,7 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
         ImageTransmission = SampleFluxOverImage / DirectFluxOverImage
         Transmission = SampleFlux / DirectFlux
         TransmissionCorrectionFactor = ImageTransmission / Transmission
-
+        # print(f'{repetition=}, {ImageTransmission=:0.08f}, {Transmission=:0.08f}, {TransmissionCorrectionFactor=:0.08f}')
         # write the findings back to the file:
         TElements = []  # we want to add two elements, so I make a list
         TElements += [

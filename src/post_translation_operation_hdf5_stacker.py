@@ -167,15 +167,24 @@ class newNewConcat(object):
                 # assure data is an array with dtype float
                 data = np.array(data, dtype=float)
                 attributes = h5out[path].attrs
-                mean = data.mean()
-                std = data.std(ddof=1)
-                sem = std / np.sqrt(np.size(data))
-                ds = h5out.create_dataset(f'{path}_mean', data=mean)
-                ds.attrs.update(attributes)
-                ds = h5out.create_dataset(f'{path}_std', data=std)
-                ds.attrs.update(attributes)
-                ds = h5out.create_dataset(f'{path}_sem', data=sem)
-                ds.attrs.update(attributes)
+                newattrs = {k: attributes[k] for k in attributes.keys()}
+                # make sure there's a note in newattrs: 
+                if "note" not in newattrs:
+                    newattrs["note"] = ""
+                newattrs['note'] = newattrs["note"] + " averaged for repetitions using post_translation_hdf5_stacker.py"
+                ds = h5out.create_dataset(f'{path}_averaged/mean', data=data.mean())
+                ds.attrs.update(newattrs)
+                ds = h5out.create_dataset(f'{path}_averaged/std', data=data.std(ddof=1))
+                ds.attrs.update(newattrs)
+                ds = h5out.create_dataset(f'{path}_averaged/sem', data=data.std(ddof=1) / np.sqrt(np.size(data)))
+                ds.attrs.update(newattrs)
+                ds = h5out.create_dataset(f'{path}_averaged/max', data=data.max())
+                ds.attrs.update(newattrs)
+                ds = h5out.create_dataset(f'{path}_averaged/min', data=data.min())
+                ds.attrs.update(newattrs)
+                ds = h5out.create_dataset(f'{path}_averaged/count', data=np.size(data))
+                newattrs.update({'units': "dimensionless"})
+                ds.attrs.update(newattrs)  # count has no units
             else:
                 logging.warning(f'path {path} not found in output file, skipping average calculation')
 
