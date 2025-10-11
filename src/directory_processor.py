@@ -5,9 +5,8 @@ from typing import Optional, Tuple, List
 import attrs
 import concurrent
 from defaults_carrier import DefaultsCarrier, load_config_from_yaml
-from checkers import processing_possible
 from YMD_class import YMD, extract_metadata_from_path
-from logbook2mouse.logbook_reader import Logbook2MouseReader
+from logbook2mouse.logbook_reader import Logbook2MouseReader  # type: ignore
 
 
 @attrs.define
@@ -29,15 +28,15 @@ class DirectoryProcessor:
         self.logger.setLevel(logging.WARNING)
         self.logger.debug(f"Initializing {self.__class__.__name__}...")
         self.logbook_reader = Logbook2MouseReader(
-            self.defaults.logbook_file, 
+            self.defaults.logbook_file,
             project_base_path=self.defaults.projects_dir
         )
 
     def process_directory(
-        self, 
-        single_dir: Optional[Path] = None, 
-        ymd: Optional[str] = None, 
-        batch: Optional[int] = None, 
+        self,
+        single_dir: Optional[Path] = None,
+        ymd: Optional[str] = None,
+        batch: Optional[int] = None,
         repetition: Optional[int] = None
     ):
         """
@@ -96,10 +95,10 @@ class DirectoryProcessor:
         return list(base_dir.glob(f"{ymd}_{batch}_*/"))
 
     def _resolve_directory(
-        self, 
-        single_dir: Optional[Path], 
-        ymd: Optional[str], 
-        batch: Optional[int], 
+        self,
+        single_dir: Optional[Path],
+        ymd: Optional[str],
+        batch: Optional[int],
         repetition: Optional[int]
     ) -> Tuple[Path, YMD, int, int]:
         """
@@ -171,15 +170,16 @@ def main():
             single_dir=Path(args.single_dir) if args.single_dir else None,
             ymd=args.ymd,
             batch=args.batch,
-            repetition=args.repetition            
+            repetition=args.repetition
             )
     else:
         assert args.ymd and args.batch, "Processing all repetitions requires YMD and batch."
         processor.process_batch(
-            ymd=args.ymd, 
-            batch=args.batch, 
+            ymd=args.ymd,
+            batch=args.batch,
             parallel=args.parallel
             )
+
 
 if __name__ == '__main__':
     main()
