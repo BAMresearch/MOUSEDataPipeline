@@ -5,7 +5,8 @@ import logging
 from YMD_class import extract_metadata_from_path
 from typing import List, Dict
 from skimage import measure, morphology
-from HDF5Translator.utils import Q_
+from HDF5Translator.utils import Q_  # type: ignore
+
 
 def get_float_from_h5(filename: Path, HDFPath: str, logger: logging.Logger) -> float:
     """
@@ -35,7 +36,7 @@ def get_str_from_h5(filename: Path, HDFPath: str, logger: logging.Logger) -> flo
     """
     Returns the value from the HDF5 file at HDFPath.
     """
-    try: 
+    try:
         with h5py.File(filename, 'r') as h5f:
             val = h5f[HDFPath][()].decode('utf-8')
     except Exception as e:
@@ -79,11 +80,11 @@ def sort_processed_files_by_instrument_configuration(processed_files: List[Path]
 
     for f in processed_files:
         measurement_config = str(get_configuration(f, logger))
-        
+
         # Add the file to the dictionary under the correct key
         if measurement_config not in config_to_files:
             config_to_files[measurement_config] = []
-        
+
         config_to_files[measurement_config].append(f)
 
     # Sort each list of files by their modification time (optional)
@@ -159,7 +160,7 @@ def label_main_feature(maskedTwoDImage: np.ndarray, logger: logging.Logger) -> n
         connectivity=1,
         return_num=True
         )
-    
+
     # Step 3: ensure we only have the main feature
     if num == 0:
         raise ValueError("No beam found in the image in call to label_main_feature.")
@@ -170,5 +171,5 @@ def label_main_feature(maskedTwoDImage: np.ndarray, logger: logging.Logger) -> n
         labels = (labels == largest_label).astype(int)
     # assert we only have one labeled region now
     assert np.unique(labels).size == 2, ValueError("More than one labeled region found in call to label_main_feature.")
-    
+
     return labels
