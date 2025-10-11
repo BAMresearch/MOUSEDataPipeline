@@ -46,6 +46,7 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
     - flux: "/entry1/sample/flux"
     - transmission: "/entry1/sample/transmission"
     - transmission_correction_factor: "/entry1/sample/transmission_correction_factor"
+    - scattering_probability: "/entry1/sample/scattering_probability_estimate"
     - absorption_total: "/entry1/sample/absorption_total"  
     - absorption_by_sample: "/entry1/sample/absorption_by_sample"
     - absorption_by_bg: "/entry1/sample/absorption_by_bg"
@@ -68,6 +69,7 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
             'flux': get_float_from_h5(input_file, "/entry1/sample/beam/flux", logger),
             'transmission': get_float_from_h5(input_file, "/entry1/sample/transmission", logger),
             'transmission_correction_factor': get_float_from_h5(input_file, "/entry1/sample/transmission_correction_factor", logger),
+            'scattering_probability': get_float_from_h5(input_file, "/entry1/sample/scattering_probability_estimate", logger),
             'absorption_total': get_float_from_h5(input_file, "/entry1/sample/absorption_total", logger),
             'absorption_by_sample': get_float_from_h5(input_file, "/entry1/sample/absorption_by_sample", logger),
             'absorption_by_bg': get_float_from_h5(input_file, "/entry1/sample/absorption_by_bg", logger),

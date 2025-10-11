@@ -57,7 +57,7 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
             process_translation_element(None, h5_out, TE)
 
         transmission = get_float_from_h5(input_file, '/entry1/sample/transmission', logger)
-        transmission_correction_factor = get_float_from_h5(input_file, '/entry1/sample/transmission_correction_factor', logger)
+        transmission_correction_factor = get_float_from_h5(input_file, '/entry1/sample/largest_transmission_correction_factor', logger)
         if transmission_correction_factor and transmission_correction_factor > 1.0:
             transmission *= transmission_correction_factor
 

@@ -15,6 +15,7 @@ from utilities import get_float_from_h5, get_str_from_h5
 doc = """
 This processing step updates the metadata transmission_correction_factor with the correction factor from the closest distance. 
 This correction factor approximates the correction for adding the scattering to the transmitted beam. It's not perfect, but at the moment the best we can do. 
+We also propagate the scattering probability estimate to all files in the batch, as this is also distance independent.
 """
 
 # Flag indicating whether this process step can be executed in parallel on multiple repetitions
@@ -52,25 +53,31 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
             return
         # get the largest correction factor from the files
         largest_correction_factor = None
+        largest_scattering_probability = None
         for f in available_files:
             correction_factor = get_float_from_h5(f, "/entry1/sample/transmission_correction_factor", logger)
+            scattering_probability = get_float_from_h5(f, "/entry1/sample/scattering_probability_estimate", logger)
             if correction_factor is not None:
                 logger.info(f"Found correction factor for {f}: {correction_factor}")
                 # Update the largest correction factor if needed
                 if largest_correction_factor is None or correction_factor > largest_correction_factor:
                     largest_correction_factor = correction_factor
+            if scattering_probability is not None:
+                logger.info(f"Found scattering probability for {f}: {scattering_probability}")
+                # Update the largest scattering probability if needed
+                if largest_scattering_probability is None or scattering_probability > largest_scattering_probability:
+                    largest_scattering_probability = scattering_probability
 
-        if largest_correction_factor == 0.0 or largest_correction_factor is None:
+
+        if largest_correction_factor == 0.0 or largest_correction_factor is None or largest_scattering_probability is None:
             logger.info(f"No valid correction factors found for batch in {dir_path}, cannot run")
             return
 
         # propagate this correction factor to all files in the batch
         for f in available_files:
             with h5py.File(f, 'a') as h5f:
-                if "/entry1/sample/transmission_correction_factor" in h5f:
-                    h5f["/entry1/sample/transmission_correction_factor"][()] = largest_correction_factor
-                else:
-                    h5f.create_dataset("/entry1/sample/transmission_correction_factor", data=largest_correction_factor)
+                h5f.create_dataset("/entry1/sample/largest_transmission_correction_factor", data=largest_correction_factor)
+                h5f.create_dataset("/entry1/sample/largest_scattering_probability_estimate", data=largest_scattering_probability)
             logger.debug(f"Updated correction factor for {f} to {largest_correction_factor}")
         logger.info(f"Completed correction factor propagation for batch in {dir_path}, using factor: {largest_correction_factor}")
 

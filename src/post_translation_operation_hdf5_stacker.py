@@ -137,7 +137,7 @@ class newNewConcat(object):
         e.g. "../../Mask/file.nxs" becomes "../Mask/file.nxs"        
         """
         with h5py.File(self.outputFile, 'a') as h5out:
-            if not path in h5out:
+            if path not in h5out:
                 logging.warning(f'path {path} not found in output file, skipping')    
                 return
 
@@ -217,17 +217,17 @@ class newNewConcat(object):
                     chunkShape[0] = 1
                     h5out.create_dataset(
                         name,
-                        shape = totalShape,
-                        chunks = tuple(chunkShape),
-                        maxshape = totalShape,
-                        dtype = obj.dtype,
-                        compression="gzip", # if we switch on gzip compression, this operation becomes very slow
+                        shape=totalShape,
+                        chunks=tuple(chunkShape),
+                        maxshape=totalShape,
+                        dtype=obj.dtype,
+                        compression="gzip",  # if we switch on gzip compression, this operation becomes very slow
                         # data = obj[()]
                     )
                     h5out[name].attrs.update(obj.attrs)
                 else:
                     logging.info(f'** uncaught object: {name}')
-            
+
             h5in.visititems(addItem)
             h5in.visititems_links(printLinkItem)
 
@@ -238,9 +238,9 @@ class newNewConcat(object):
                     logging.debug(f'adding data to stack: {path} at stackLocation: {addAtStackLocation}')
                     # print(f'adding data to stack: {path} at stackLocation: {addAtStackLocation}')
                     h5out[path][addAtStackLocation] = h5in[path][()]            
-                elif not path in h5in:
+                elif path not in h5in:
                     logging.warning(f'** could not find path {path} in input file,. skipping...')
-                elif not path in h5out:
+                elif path not in h5out:
                     logging.warning(f'** could not find path {path} in output file, skipping...')
                 else:
                     logging.warning(f'** uncaught error with path {path}, skipping...')
@@ -265,7 +265,7 @@ def main(
         stack_datasets = config.get("stack_datasets", None)
         calculate_average = config.get("calculate_average", None)
         adjust_relative_path_oneup = config.get("adjust_relative_path_oneup", None)
-    # at least the stack_datasets dictionary must exist: 
+    # at least the stack_datasets dictionary must exist:
     assert stack_datasets is not None, "The configuration file must contain a 'stack_datasets' section."
     # Stack the datasets
     newNewConcat(output, auxiliary_files, stack_datasets, calculate_average, adjust_relative_path_oneup)
