@@ -110,6 +110,7 @@ def dynamic_beam_analysis(imageData: np.ndarray, coverage: float = 0.997, beam_c
     if beam_coverage_mask is not None:
         assert beam_coverage_mask.shape == maskedTwoDImage.shape, "Provided beam_coverage_mask must have the same shape as imageData"
         beam_coverage_mask = beam_coverage_mask.astype(int)
+        achieved_coverage = None  # we assume the provided mask is good enough
     else:
 
         labels = label_main_feature(maskedTwoDImage, logging.getLogger())
@@ -141,7 +142,7 @@ def dynamic_beam_analysis(imageData: np.ndarray, coverage: float = 0.997, beam_c
     ITotal_region = float(properties[0].intensity_image.sum())
     ITotal_overall = float(maskedTwoDImage.sum())
 
-    return weighted_center_of_mass, ITotal_region, ITotal_overall, beam_coverage_mask, sigma_minor, sigma_major, theta
+    return weighted_center_of_mass, ITotal_region, ITotal_overall, beam_coverage_mask, sigma_minor, sigma_major, theta, achieved_coverage
 
 
 def can_run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2MouseReader, logger: logging.Logger) -> bool:
@@ -183,8 +184,10 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
         "DirectFluxOverImagePath": "/entry1/processing/direct_beam_profile/beam_analysis/FluxOverImage",
         "ScatteringProbabilityEstimatePath": "/entry1/sample/scattering_probability_estimate",
         "TightBeamMaskPath": "/entry1/processing/direct_beam_profile/beam_analysis/tight_beam_mask",
+        "TargetCoveragePath": "/entry1/processing/direct_beam_profile/beam_analysis/target_coverage",
+        "AchievedCoveragePath": "/entry1/processing/direct_beam_profile/beam_analysis/achieved_coverage",
     }
-
+    target_coverage = 0.997  # target coverage for tight beam mask determination
     ymd, batch, repetition = extract_metadata_from_path(dir_path)
     try:
         input_file = dir_path / f'MOUSE_{ymd}_{batch}_{repetition}.nxs'
@@ -215,9 +218,9 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
         TransmissionCorrectionFactor = ImageTransmission / Transmission
 
         # now we calculate the estimate for the multiple scattering based on a tight beam mask on the direct beam image:
-        _, _, _, tightBeamMask, _, _, _ = dynamic_beam_analysis(DirectBeamData, coverage=0.997, beam_coverage_mask=None)
+        _, _, _, tightBeamMask, _, _, _, achieved_coverage = dynamic_beam_analysis(DirectBeamData, coverage=target_coverage, beam_coverage_mask=None)
         # and determine the fluxes in the sample beam image under that mask:
-        _, sample_tight_beam_flux, sample_overall_flux, _, _, _, _ = dynamic_beam_analysis(SampleBeamData, coverage=0.997, beam_coverage_mask=tightBeamMask)
+        _, sample_tight_beam_flux, sample_overall_flux, _, _, _, _, _ = dynamic_beam_analysis(SampleBeamData, coverage=target_coverage, beam_coverage_mask=tightBeamMask)
         scattering_probability_estimate = (sample_overall_flux - sample_tight_beam_flux) / sample_overall_flux
 
         # print(f'{repetition=}, {ImageTransmission=:0.08f}, {Transmission=:0.08f}, {TransmissionCorrectionFactor=:0.08f}')
@@ -322,7 +325,29 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
                 },
                 source_units="dimensionless",
                 destination_units="dimensionless",
-            )
+            ),
+            TranslationElement(
+                destination=readPaths['TargetCoveragePath'],
+                data_type="float",
+                minimum_dimensionality=1,
+                default_value=target_coverage,
+                attributes={
+                    "note": "Target coverage of the tight beam mask on the direct beam image, originating from beam_flux_and_transmissions post-translation processing script."
+                },
+                source_units="dimensionless",
+                destination_units="dimensionless",
+            ),
+            TranslationElement(
+                destination=readPaths['AchievedCoveragePath'],
+                data_type="float",
+                minimum_dimensionality=1,
+                default_value=achieved_coverage,
+                attributes={
+                    "note": "Achieved coverage of the tight beam mask on the direct beam image, originating from beam_flux_and_transmissions post-translation processing script."
+                },
+                source_units="dimensionless",
+                destination_units="dimensionless",
+            ),
         ]
 
         # writing the resulting metadata back to the main HDF5 file
