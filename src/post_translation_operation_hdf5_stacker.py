@@ -1,29 +1,30 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-description = """
-Post-translation HDF5 step for stacking datasets and metadata from 
-multiple repetitions of a measurement. 
-
-Usage:
-  python post_translation_hdf5_stacker -k config=stacking_config.yaml --output measurement_stacked.h5 --auxiliary_files input_file1.h5 input_file2.h5
-
-"""
-
 import argparse
 import h5py
 import numpy as np
 import yaml
 import logging
 from pathlib import Path
-
 # from HDF5Translator.utils.data_utils import sanitize_attribute
 from HDF5Translator.utils.validators import (
     validate_file, validate_file_delete_if_exists, validate_yaml_file
 )
 from HDF5Translator.utils.configure_logging import configure_logging
 
-def canStack(filename:Path)->bool:
+
+description = """
+Post-translation HDF5 step for stacking datasets and metadata from
+multiple repetitions of a measurement.
+
+Usage:
+  python post_translation_hdf5_stacker -k config=stacking_config.yaml --output measurement_stacked.h5 --auxiliary_files input_file1.h5 input_file2.h5
+
+"""
+
+
+def canStack(filename: Path) -> bool:
     """
     Check if a file can be stacked.
     Parameters
@@ -32,50 +33,50 @@ def canStack(filename:Path)->bool:
         The path of the file to check.
     Returns
     -------
-    bool 
+    bool
         True if the file can be stacked.
     """
     # checklist for a few key critical items to ensure we've preprocessed correctly:
     checkList = [
         # "entry1/experiment/environment_temperature",
         # "entry1/experiment/stage_temperature",
-        "entry1/instrument/detector00/data", # assure primary data is there
+        "entry1/instrument/detector00/data",  # assure primary data is there
 
-        "entry1/sample/beam/flux", # beam analysis has been done
+        "entry1/sample/beam/flux",  # beam analysis has been done
         "entry1/sample/beam/incident_wavelength",
         # "entry1/sample/thickness", # thickness calculation has been entered from the beam analysis
-        "entry1/sample/transmission", # beam analysis with both beams is there
+        "entry1/sample/transmission",  # beam analysis with both beams is there
 
-        "entry1/processing/direct_beam_profile/beam_analysis/centerOfMass",        
-        # "entry1/processing/sample_beam_profile/beam_analysis/centerOfMass",        
-    ]
+        "entry1/processing/direct_beam_profile/beam_analysis/centerOfMass",
+        ]
     # check that the filenames referenced in these paths exist:
     checkFileExistence = [
         # background file cannot be checked at this stage as it might not exist yet. :(
-        # "entry1/processing_required_metadata/background_file", 
-        "entry1/processing_required_metadata/mask_file", 
-    ]
+        # "entry1/processing_required_metadata/background_file",
+        "entry1/processing_required_metadata/mask_file",
+        ]
 
     with h5py.File(filename, 'r') as h5f:
         try:
             for path in checkList:
-                if not path in h5f:
+                if path not in h5f:
                     logging.warning(f'path not found: {path} in file {filename}')
                     return False
 
             for path in checkFileExistence:
-                if not path in h5f:
+                if path not in h5f:
                     logging.warning(f'path not found: {path} in file {filename}')
                     return False
-                full_path = Path(filename.parent, h5f[path][()].decode('utf-8')).resolve() # relative paths
+                full_path = Path(filename.parent, h5f[path][()].decode('utf-8')).resolve()  # relative paths
                 if not full_path.is_file():
                     logging.warning(f'file {h5f[path][()].decode('utf-8')} not found at: {path} in file {filename}')
                     return False
 
-        except Exception as e:
+        except Exception:
             return False
 
     return True
+
 
 class newNewConcat(object):
     """
@@ -87,12 +88,12 @@ class newNewConcat(object):
     stackItems = None
 
     def __init__(
-            self, 
-            outputFile:Path = None, 
-            filenames:list = [], 
-            stackItems:list = [], 
-            calculate_average:list = [],
-            adjust_relative_path_oneup:list = []
+            self,
+            outputFile: Path = None,
+            filenames: list = [],
+            stackItems: list = [],
+            calculate_average: list = [],
+            adjust_relative_path_oneup: list = []
             ):
         assert isinstance(outputFile, Path), 'output filename must be a path instance'
         assert len(filenames) > 0, 'at least one file is required for stacking.'
@@ -117,12 +118,12 @@ class newNewConcat(object):
 
         # use the first file as a template, increasing the size of the datasets to stack
 
-        self.createStructureFromFile(filenames[0], addShape = (len(filenames),)) # addShape = (len(filenames), 1)
+        self.createStructureFromFile(filenames[0], addShape=(len(filenames),))  # addShape = (len(filenames), 1)
 
         # add the datasets to the file.. this could perhaps be done in parallel
-        for idx, filename in enumerate(filenames): 
+        for idx, filename in enumerate(filenames):
             # print(f'adding file {idx+1} of {len(filenames)}: {filename}')
-            self.addDataToStack(filename, addAtStackLocation = idx)
+            self.addDataToStack(filename, addAtStackLocation=idx)
 
         # now we calculate the mean, std and standard error on the mean of selected datasets:
         for path in calculate_average:
@@ -130,15 +131,15 @@ class newNewConcat(object):
 
         for path in adjust_relative_path_oneup:
             self.adjustRelativePath(path)
-        
+
     def adjustRelativePath(self, path):
         """
-        adjusts the relative paths in the location to be one level up, 
-        e.g. "../../Mask/file.nxs" becomes "../Mask/file.nxs"        
+        adjusts the relative paths in the location to be one level up,
+        e.g. "../../Mask/file.nxs" becomes "../Mask/file.nxs"
         """
         with h5py.File(self.outputFile, 'a') as h5out:
             if path not in h5out:
-                logging.warning(f'path {path} not found in output file, skipping')    
+                logging.warning(f'path {path} not found in output file, skipping')
                 return
 
             oldPath = h5out[path][()]
@@ -168,7 +169,7 @@ class newNewConcat(object):
                 data = np.array(data, dtype=float)
                 attributes = h5out[path].attrs
                 newattrs = {k: attributes[k] for k in attributes.keys()}
-                # make sure there's a note in newattrs: 
+                # make sure there's a note in newattrs:
                 if "note" not in newattrs:
                     newattrs["note"] = ""
                 newattrs['note'] = newattrs["note"] + " averaged for repetitions using post_translation_hdf5_stacker.py"
@@ -195,11 +196,11 @@ class newNewConcat(object):
             # using h5py.visititems to walk the file
 
             def printLinkItem(name, obj):
-                logging.debug(f'Link item found: {name= }, {obj= }')
+                logging.debug(f'Link item found: {name= }, {obj= }')  # noqa: E202, E251
 
             def addItem(name, obj):
                 if 'entry1/instrument/detector/detectorSpecific' in name:
-                    logging.debug(f'found the path: {name} in file {ifname}')                
+                    logging.debug(f'found the path: {name} in file {ifname}')
                 if isinstance(obj, h5py.Group):
                     logging.debug(f'adding group: {name}')
                     h5out.create_group(name)
@@ -237,7 +238,7 @@ class newNewConcat(object):
                 if path in h5in and path in h5out:
                     logging.debug(f'adding data to stack: {path} at stackLocation: {addAtStackLocation}')
                     # print(f'adding data to stack: {path} at stackLocation: {addAtStackLocation}')
-                    h5out[path][addAtStackLocation] = h5in[path][()]            
+                    h5out[path][addAtStackLocation] = h5in[path][()]
                 elif path not in h5in:
                     logging.warning(f'** could not find path {path} in input file,. skipping...')
                 elif path not in h5out:
