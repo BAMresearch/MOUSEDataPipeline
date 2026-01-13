@@ -80,7 +80,7 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
             TranslationElement(
                 # source is none since we're storing derived data
                 destination=xOutPath,
-                minimum_dimensionality=1,
+                minimum_dimensionality=3,
                 data_type="float32",
                 default_value=weighted_center_of_mass[1],
                 source_units="eigerpixels",
@@ -97,7 +97,7 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
             TranslationElement(
                 # source is none since we're storing derived data
                 destination=zOutPath,
-                minimum_dimensionality=1,
+                minimum_dimensionality=3,
                 data_type="float32",
                 default_value=weighted_center_of_mass[0],
                 source_units="eigerpixels",

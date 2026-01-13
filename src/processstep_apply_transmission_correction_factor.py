@@ -48,7 +48,7 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
             TE = TranslationElement(
                 destination='/entry1/sample/transmission_beam',
                 data_type="float",
-                minimum_dimensionality=1,
+                minimum_dimensionality=3,
                 default_value=h5_out['/entry1/sample/transmission'][...],
                 attributes={
                     "note": "Beam transmission value (without correction for scattered/diffracted photons). Determined by the beam_analysis post-translation processing script",
@@ -64,7 +64,7 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
         TE = TranslationElement(
                 destination='/entry1/sample/transmission',
                 data_type="float",
-                minimum_dimensionality=1,
+                minimum_dimensionality=3,
                 default_value=transmission,
                 attributes={
                     "note": "Beam transmission value corrected with the transmission_correction_factor to approximate the total transmission including scattered/diffracted photons.",

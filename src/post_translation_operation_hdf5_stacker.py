@@ -93,6 +93,7 @@ class newNewConcat(object):
             filenames: list = [],
             stackItems: list = [],
             calculate_average: list = [],
+            calculate_average_vector: list = [],
             adjust_relative_path_oneup: list = []
             ):
         assert isinstance(outputFile, Path), 'output filename must be a path instance'
@@ -129,6 +130,9 @@ class newNewConcat(object):
         for path in calculate_average:
             self.calculateAverage(path)
 
+        for path in calculate_average_vector:
+            self.calculateAverage(path, leaveNLastDimensions=1)
+
         for path in adjust_relative_path_oneup:
             self.adjustRelativePath(path)
 
@@ -160,28 +164,41 @@ class newNewConcat(object):
                 return
             h5out[path][...] = str(newPath)
 
-    def calculateAverage(self, path):
+    def calculateAverage(self, path: str, leaveNLastDimensions: int = 0) -> None:
+        """
+        calculates the average, standard deviation, standard error on the mean,
+        max, min and count of the dataset at path over all but the last leaveNLastDimensions dimensions.
+        The results are stored in datasets at path+'_averaged/mean', path+'_averaged/std', etc.
+
+        leaveNLastDimensions averages over all but the last N dimensions.
+        0 (default) averages over all dimensions.
+        """
         with h5py.File(self.outputFile, 'a') as h5out:
             if path in h5out:
                 logging.debug(f'calculating average for path: {path}')
                 data = h5out[path][()]
                 # assure data is an array with dtype float
                 data = np.array(data, dtype=float)
+                # verify we ahve enough dimensions to leaveNLastDimensions
+                if data.ndim <= leaveNLastDimensions:
+                    logging.warning(f'path {path} has not enough dimensions ({data.ndim}) to leave {leaveNLastDimensions} last dimensions, skipping average calculation')
+                    return
+                # calculate mean, std, sem, max, min, count over all but the last leaveNLastDimensions dimensions
                 attributes = h5out[path].attrs
                 newattrs = {k: attributes[k] for k in attributes.keys()}
                 # make sure there's a note in newattrs:
                 if "note" not in newattrs:
                     newattrs["note"] = ""
                 newattrs['note'] = newattrs["note"] + " averaged for repetitions using post_translation_hdf5_stacker.py"
-                ds = h5out.create_dataset(f'{path}_averaged/mean', data=data.mean())
+                ds = h5out.create_dataset(f'{path}_averaged/mean', data=data.mean(axis=tuple(range(data.ndim - leaveNLastDimensions))))
                 ds.attrs.update(newattrs)
-                ds = h5out.create_dataset(f'{path}_averaged/std', data=data.std(ddof=1))
+                ds = h5out.create_dataset(f'{path}_averaged/std', data=data.std(ddof=1, axis=tuple(range(data.ndim - leaveNLastDimensions))))
                 ds.attrs.update(newattrs)
-                ds = h5out.create_dataset(f'{path}_averaged/sem', data=data.std(ddof=1) / np.sqrt(np.size(data)))
+                ds = h5out.create_dataset(f'{path}_averaged/sem', data=data.std(ddof=1, axis=tuple(range(data.ndim - leaveNLastDimensions))) / np.sqrt(np.prod(data.shape[:data.ndim - leaveNLastDimensions])))
                 ds.attrs.update(newattrs)
-                ds = h5out.create_dataset(f'{path}_averaged/max', data=data.max())
+                ds = h5out.create_dataset(f'{path}_averaged/max', data=data.max(axis=tuple(range(data.ndim - leaveNLastDimensions))))
                 ds.attrs.update(newattrs)
-                ds = h5out.create_dataset(f'{path}_averaged/min', data=data.min())
+                ds = h5out.create_dataset(f'{path}_averaged/min', data=data.min(axis=tuple(range(data.ndim - leaveNLastDimensions))))
                 ds.attrs.update(newattrs)
                 ds = h5out.create_dataset(f'{path}_averaged/count', data=np.size(data))
                 newattrs.update({'units': "dimensionless"})
@@ -265,11 +282,12 @@ def main(
         config = yaml.safe_load(f)
         stack_datasets = config.get("stack_datasets", None)
         calculate_average = config.get("calculate_average", None)
+        calculate_average_vector = config.get("calculate_average_vector", None)
         adjust_relative_path_oneup = config.get("adjust_relative_path_oneup", None)
     # at least the stack_datasets dictionary must exist:
     assert stack_datasets is not None, "The configuration file must contain a 'stack_datasets' section."
     # Stack the datasets
-    newNewConcat(output, auxiliary_files, stack_datasets, calculate_average, adjust_relative_path_oneup)
+    newNewConcat(output, auxiliary_files, stack_datasets, calculate_average, calculate_average_vector, adjust_relative_path_oneup)
 
     logging.info("Post-translation processing complete.")
 

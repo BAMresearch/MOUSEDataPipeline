@@ -230,7 +230,7 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
             TranslationElement(
                 destination=readPaths['DirectFluxOverImagePath'],
                 data_type="float",
-                minimum_dimensionality=1,
+                minimum_dimensionality=3,
                 default_value=DirectFluxOverImage,
                 attributes={
                     "note": "(Darkcurrent-compensated) beam flux over the entire image, determined by the beam flux and transmissions post-translation processing script",
@@ -241,7 +241,7 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
             TranslationElement(
                 destination=readPaths['SampleFluxOverImagePath'],
                 data_type="float",
-                minimum_dimensionality=1,
+                minimum_dimensionality=3,
                 default_value=SampleFluxOverImage,
                 attributes={
                     "note": "(Darkcurrent-compensated) beam flux over the entire image with sample in beam, determined by the beam flux and transmissions post-translation processing script",
@@ -252,7 +252,7 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
             TranslationElement(
                 destination=readPaths['DirectFluxOutPath'],
                 data_type="float",
-                minimum_dimensionality=1,
+                minimum_dimensionality=3,
                 default_value=DirectFlux,
                 attributes={
                     "note": "Beam flux under the beam mask, determined by the beam flux and transmissions post-translation processing script",
@@ -263,7 +263,7 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
             TranslationElement(
                 destination=readPaths['SampleFluxOutPath'],
                 data_type="float",
-                minimum_dimensionality=1,
+                minimum_dimensionality=3,
                 default_value=SampleFlux,
                 attributes={
                     "note": "Beam flux under the beam mask with sample in beam, determined by the beam flux and transmissions post-translation processing script",
@@ -274,7 +274,7 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
             TranslationElement(
                 destination=readPaths['ImageTransmissionOutPath'],
                 data_type="float",
-                minimum_dimensionality=1,
+                minimum_dimensionality=3,
                 default_value=ImageTransmission,
                 attributes={
                     "note": "Image transmission factor (ratio of sample to direct beam flux over entire image), determined by the beam flux and transmissions post-translation processing script",
@@ -285,7 +285,7 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
             TranslationElement(
                 destination=readPaths['TransmissionOutPath'],
                 data_type="float",
-                minimum_dimensionality=1,
+                minimum_dimensionality=3,
                 default_value=Transmission,
                 attributes={
                     "note": "Beam transmission factor (ratio of sample to direct beam flux under beam mask), determined by the beam flux and transmissions post-translation processing script",
@@ -296,7 +296,7 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
             TranslationElement(
                 destination=readPaths['TransmissionCorrectionFactorOutPath'],
                 data_type="float",
-                minimum_dimensionality=1,
+                minimum_dimensionality=3,
                 default_value=TransmissionCorrectionFactor,
                 attributes={
                     "note": "Correction factor applied to the image transmission, determined by the beam flux and transmissions post-translation processing script",
@@ -307,7 +307,7 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
             TranslationElement(
                 destination=readPaths['ScatteringProbabilityEstimatePath'],
                 data_type="float",
-                minimum_dimensionality=1,
+                minimum_dimensionality=3,
                 default_value=scattering_probability_estimate,
                 attributes={
                     "note": "Estimate for the scattering probability based on a tight beam mask on the direct beam image, determined by the beam flux and transmissions post-translation processing script",

@@ -161,7 +161,7 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
             TranslationElement(
                 # source is none since we're storing derived data
                 destination='/entry1/sample/samplethickness',
-                minimum_dimensionality=1,
+                minimum_dimensionality=3,
                 data_type="float",
                 default_value=entry.samplethickness,
                 attributes={

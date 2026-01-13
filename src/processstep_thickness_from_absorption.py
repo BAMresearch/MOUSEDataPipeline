@@ -117,7 +117,7 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
             TranslationElement(
                 # source is none since we're storing derived data
                 destination="/entry1/sample/absorptionDerivedThickness",
-                minimum_dimensionality=1,
+                minimum_dimensionality=3,
                 data_type="float32",
                 default_value=thickness,
                 source_units="m",
@@ -129,7 +129,7 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
             TranslationElement(
                 # source is none since we're storing derived data
                 destination="/entry1/sample/absorption_total",
-                minimum_dimensionality=1,
+                minimum_dimensionality=3,
                 data_type="float32",
                 default_value=absorption,
                 source_units="",
@@ -141,7 +141,7 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
             TranslationElement(
                 # source is none since we're storing derived data
                 destination="/entry1/sample/absorption_by_sample",
-                minimum_dimensionality=1,
+                minimum_dimensionality=3,
                 data_type="float32",
                 default_value=absorption_sample,
                 source_units="",
@@ -153,7 +153,7 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
             TranslationElement(
                 # source is none since we're storing derived data
                 destination="/entry1/sample/absorption_by_bg",
-                minimum_dimensionality=1,
+                minimum_dimensionality=3,
                 data_type="float32",
                 default_value=absorption_bg,
                 source_units="",
@@ -175,7 +175,7 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
             TElements += [TranslationElement(
                 # source is none since we're storing derived data
                 destination="/entry1/sample/thickness",
-                minimum_dimensionality=1,
+                minimum_dimensionality=3,
                 data_type="float32",
                 default_value=thickness,
                 source_units="m",
@@ -191,7 +191,7 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
             TElements += [TranslationElement(
                 # source is none since we're storing derived data
                 destination="/entry1/sample/thickness",
-                minimum_dimensionality=1,
+                minimum_dimensionality=3,
                 data_type="float32",
                 default_value=samplethickness,
                 source_units="m",
