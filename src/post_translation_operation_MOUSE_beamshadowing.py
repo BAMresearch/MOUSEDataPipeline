@@ -56,6 +56,19 @@ def beamAnalysis(imageData: np.ndarray, ROI_SIZE: int) -> (tuple, float):
     # Step 2: get rid of masked or pegged pixels on an Eiger detector
     labeled_foreground = (np.logical_and(imageData >= 0, imageData <= 1e9)).astype(int)
     maskedTwoDImage = imageData * labeled_foreground  # apply mask
+
+    # eliminate hot pixel for Mo
+    brightest_pixel = np.unravel_index(maskedTwoDImage.argmax(), maskedTwoDImage.shape)
+    indices = np.indices(maskedTwoDImage.shape)
+    weights = maskedTwoDImage
+    weights[brightest_pixel] = 0
+    weighted_center_of_mass = (np.average(indices[0], weights = weights),
+                               np.average(indices[1], weights = weights)
+                               )
+    print(weighted_center_of_mass, brightest_pixel)
+    # mask if the brightest pixel is far away from the center of mass
+    if ((np.array(brightest_pixel) - np.array(weighted_center_of_mass))**2).sum() > 50:
+
     threshold_value = np.maximum(
         1, 0.0001 * maskedTwoDImage.max()
     )  # filters.threshold_otsu(maskedTwoDImage) # ignore zero pixels
