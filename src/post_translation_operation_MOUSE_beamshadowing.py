@@ -145,18 +145,18 @@ def main(
     SampleFluxOutPath = "/entry1/processing/sample_beam_profile/beam_analysis/flux"
     DirectFluxOutPath = "/entry1/sample/beam/flux"
     if imageType == "direct_beam":
-        BeamDatapath = "/entry1/processing/direct_beam_profile/data/data_000001"
+        BeamDatapath = "/entry1/processing/direct_beam_profile/data"
         BeamDurationPath = (
-            "/entry1/processing/direct_beam_profile/instrument/detector/frame_time"
+            "/entry1/instrument/detector00/count_time"
         )
         COMOutPath = "/entry1/processing/direct_beam_profile/beam_analysis/centerOfMass"
         xOutPath = "/entry1/instrument/detector00/transformations/det_y"
         zOutPath = "/entry1/instrument/detector00/transformations/det_z"
         FluxOutPath = DirectFluxOutPath
     elif imageType == "sample_beam":
-        BeamDatapath = "/entry1/processing/sample_beam_profile/data/data_000001"
+        BeamDatapath = "/entry1/processing/sample_beam_profile/data"
         BeamDurationPath = (
-            "/entry1/processing/sample_beam_profile/instrument/detector/frame_time"
+            "/entry1/instrument/detector00/count_time"
         )
         COMInPath = "/entry1/processing/direct_beam_profile/beam_analysis/centerOfMass"
         COMOutPath = "/entry1/processing/sample_beam_profile/beam_analysis/centerOfMass"
