@@ -22,8 +22,10 @@ Usage:
 
 """
 
+LOGGER = logging.getLogger(__name__)
 
-def canStack(filename: Path) -> bool:
+
+def canStack(filename: Path, logger: logging.Logger | None = None) -> bool:
     """
     Check if a file can be stacked.
     Parameters
@@ -35,6 +37,7 @@ def canStack(filename: Path) -> bool:
     bool
         True if the file can be stacked.
     """
+    logger = logger or LOGGER
     # checklist for a few key critical items to ensure we've preprocessed correctly:
     checkList = [
         # "entry1/experiment/environment_temperature",
@@ -57,16 +60,16 @@ def canStack(filename: Path) -> bool:
         try:
             for path in checkList:
                 if path not in h5f:
-                    logging.warning(f"path not found: {path} in file {filename}")
+                    logger.warning(f"path not found: {path} in file {filename}")
                     return False
 
             for path in checkFileExistence:
                 if path not in h5f:
-                    logging.warning(f"path not found: {path} in file {filename}")
+                    logger.warning(f"path not found: {path} in file {filename}")
                     return False
                 full_path = Path(filename.parent, h5f[path][()].decode("utf-8")).resolve()  # relative paths
                 if not full_path.is_file():
-                    logging.warning(f"file {h5f[path][()].decode('utf-8')} not found at: {path} in file {filename}")
+                    logger.warning(f"file {h5f[path][()].decode('utf-8')} not found at: {path} in file {filename}")
                     return False
 
         except Exception:
@@ -92,10 +95,12 @@ class newNewConcat(object):
         stackItems: list | None = None,
         calculate_average: list | None = None,
         adjust_relative_path_oneup: list | None = None,
+        logger: logging.Logger | None = None,
     ):
         if not isinstance(outputFile, Path):
             raise TypeError("output filename must be a path instance")
 
+        self.logger = logger or LOGGER
         filenames = list(filenames or [])
         stackItems = list(stackItems or [])
         calculate_average = list(calculate_average or [])
@@ -110,11 +115,13 @@ class newNewConcat(object):
             if not fname.exists():
                 raise FileNotFoundError(f"filename {fname} does not exist in the list of files to stack")
             # if the file does not pass the canStack test, remove it from the list:
-            if not canStack(fname):
+            if not canStack(fname, logger=self.logger):
                 okFilenames.remove(fname)
-                logging.warning(f"file {fname} does not pass the canStack test, removing from list of files to stack.")
+                self.logger.warning(
+                    f"file {fname} does not pass the canStack test, removing from list of files to stack."
+                )
                 # save the file in an error list text file:
-                with open(outputFile.with_suffix(".stacking_error_list"), "a") as f:
+                with open(outputFile.with_suffix(".stacking_error_list"), "a", encoding="utf-8") as f:
                     f.write(f"{fname}\n")
         if len(okFilenames) == 0:
             raise ValueError("after checking, not enough valid files for stacking")
@@ -149,31 +156,31 @@ class newNewConcat(object):
         """
         with h5py.File(self.outputFile, "a") as h5out:
             if path not in h5out:
-                logging.warning(f"path {path} not found in output file, skipping")
+                self.logger.warning(f"path {path} not found in output file, skipping")
                 return
 
             oldPath = h5out[path][()]
             if oldPath is None:
-                logging.debug(f"path {path} is empty, skipping")
+                self.logger.debug(f"path {path} is empty, skipping")
                 return
             if isinstance(oldPath, bytes):
                 oldPath = oldPath.decode("utf-8")
 
             if oldPath == "":
-                logging.debug(f"path {path} is empty, skipping")
+                self.logger.debug(f"path {path} is empty, skipping")
                 return
             oldPath = Path(h5out[path][()].decode("utf-8"))
             try:
                 newPath = oldPath.relative_to("..")
             except ValueError:
-                logging.warning(f"path {path} already at root level or cannot be made relative to parent, skipping")
+                self.logger.warning(f"path {path} already at root level or cannot be made relative to parent, skipping")
                 return
             h5out[path][...] = str(newPath)
 
     def calculateAverage(self, path):
         with h5py.File(self.outputFile, "a") as h5out:
             if path in h5out:
-                logging.debug(f"calculating average for path: {path}")
+                self.logger.debug(f"calculating average for path: {path}")
                 data = h5out[path][()]
                 # assure data is an array with dtype float
                 data = np.array(data, dtype=float)
@@ -197,7 +204,7 @@ class newNewConcat(object):
                 newattrs.update({"units": "dimensionless"})
                 ds.attrs.update(newattrs)  # count has no units
             else:
-                logging.warning(f"path {path} not found in output file, skipping average calculation")
+                self.logger.warning(f"path {path} not found in output file, skipping average calculation")
 
     def createStructureFromFile(self, ifname, addShape):
         """addShape is a tuple with the dimensions to add to the normal datasets. i.e. (280, 1) will add those dimensions to the array shape"""
@@ -206,23 +213,23 @@ class newNewConcat(object):
             # using h5py.visititems to walk the file
 
             def printLinkItem(name, obj):
-                logging.debug(f"Link item found: {name= }, {obj= }")  # noqa: E202, E251
+                self.logger.debug(f"Link item found: {name= }, {obj= }")  # noqa: E202, E251
 
             def addItem(name, obj):
                 if "entry1/instrument/detector/detectorSpecific" in name:
-                    logging.debug(f"found the path: {name} in file {ifname}")
+                    self.logger.debug(f"found the path: {name} in file {ifname}")
                 if isinstance(obj, h5py.Group):
-                    logging.debug(f"adding group: {name}")
+                    self.logger.debug(f"adding group: {name}")
                     h5out.create_group(name)
                     # add attributes
                     h5out[name].attrs.update(obj.attrs)
                 elif isinstance(obj, h5py.Dataset) and name not in self.stackItems:
-                    logging.debug(f"plainly adding dataset: {name}")
+                    self.logger.debug(f"plainly adding dataset: {name}")
                     h5in.copy(name, h5out, expand_external=True, name=name)
                     h5out[name].attrs.update(obj.attrs)
                     # h5out.create_dataset(name, data=obj[()])
                 elif isinstance(obj, h5py.Dataset) and name in self.stackItems:
-                    logging.debug(
+                    self.logger.debug(
                         f"preparing by initializing the stacked dataset: {name} to shape {(*addShape, *obj.shape)}"
                     )
                     totalShape = (*addShape, *obj.shape)
@@ -239,7 +246,7 @@ class newNewConcat(object):
                     )
                     h5out[name].attrs.update(obj.attrs)
                 else:
-                    logging.info(f"** uncaught object: {name}")
+                    self.logger.info(f"** uncaught object: {name}")
 
             h5in.visititems(addItem)
             h5in.visititems_links(printLinkItem)
@@ -248,15 +255,15 @@ class newNewConcat(object):
         with h5py.File(ifname, "r") as h5in, h5py.File(self.outputFile, "a") as h5out:
             for path in self.stackItems:
                 if path in h5in and path in h5out:
-                    logging.debug(f"adding data to stack: {path} at stackLocation: {addAtStackLocation}")
+                    self.logger.debug(f"adding data to stack: {path} at stackLocation: {addAtStackLocation}")
                     # print(f'adding data to stack: {path} at stackLocation: {addAtStackLocation}')
                     h5out[path][addAtStackLocation] = h5in[path][()]
                 elif path not in h5in:
-                    logging.warning(f"** could not find path {path} in input file,. skipping...")
+                    self.logger.warning(f"** could not find path {path} in input file,. skipping...")
                 elif path not in h5out:
-                    logging.warning(f"** could not find path {path} in output file, skipping...")
+                    self.logger.warning(f"** could not find path {path} in output file, skipping...")
                 else:
-                    logging.warning(f"** uncaught error with path {path}, skipping...")
+                    self.logger.warning(f"** uncaught error with path {path}, skipping...")
 
 
 # If you are adjusting the template for your needs, you probably only need to touch the main function:
@@ -264,8 +271,10 @@ def main(
     output: Path,
     auxiliary_files: list[Path],
     config: Path,
+    logger: logging.Logger | None = None,
 ):
     """ """
+    logger = logger or LOGGER
     # Process input parameters:
     # Make sure we have at least two files to stack, something argparse cannot do
     if len(auxiliary_files) < 1:
@@ -282,9 +291,16 @@ def main(
         raise ValueError("The configuration file must contain a 'stack_datasets' section.")
 
     # Stack the datasets
-    newNewConcat(output, auxiliary_files, stack_datasets, calculate_average, adjust_relative_path_oneup)
+    newNewConcat(
+        output,
+        auxiliary_files,
+        stack_datasets,
+        calculate_average,
+        adjust_relative_path_oneup,
+        logger=logger,
+    )
 
-    logging.info("Post-translation processing complete.")
+    logger.info("Post-translation processing complete.")
 
 
 def setup_argparser():
@@ -350,10 +366,10 @@ if __name__ == "__main__":
         log_file_prepend="PostTranslation_stacker_",
     )
 
-    logging.info(f"Stacking into new file: {args.output}")
-    logging.info(f"with configuration file: {args.config}")
+    LOGGER.info(f"Stacking into new file: {args.output}")
+    LOGGER.info(f"with configuration file: {args.config}")
     if args.auxiliary_files:
         for auxiliary_file in args.auxiliary_files:
-            logging.info(f"stacking source file: {auxiliary_file}")
+            LOGGER.info(f"stacking source file: {auxiliary_file}")
 
-    main(args.output, args.auxiliary_files, args.config)
+    main(args.output, args.auxiliary_files, args.config, logger=LOGGER)

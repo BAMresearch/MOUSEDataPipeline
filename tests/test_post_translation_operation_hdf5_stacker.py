@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 import h5py
@@ -85,6 +86,28 @@ def test_stacker_main_stacks_and_adjusts_paths(tmp_path: Path):
         np.testing.assert_allclose(h5f["/entry1/sample/transmission"][()], np.array([1.0, 3.0], dtype=np.float32))
         assert h5f["/entry1/sample/transmission_averaged/mean"][()] == pytest.approx(2.0)
         assert _read_scalar_string(h5f["/entry1/processing_required_metadata/mask_file"]) == "Masks/mask.nxs"
+
+
+def test_stacker_main_uses_provided_logger(tmp_path: Path, caplog):
+    input_a = tmp_path / "inputs" / "a.nxs"
+    mask_file = tmp_path / "Masks" / "mask.nxs"
+    output_file = tmp_path / "stacked.nxs"
+    config_file = tmp_path / "stacker.yaml"
+
+    _write_stackable_input(input_a, np.full((2, 2), 1.0, dtype=np.float32), mask_file)
+    config_file.write_text("stack_datasets:\n  - entry1/sample/transmission\n", encoding="utf-8")
+
+    logger = logging.getLogger("test_stacker")
+    caplog.set_level(logging.INFO, logger="test_stacker")
+
+    post_translation_operation_hdf5_stacker.main(
+        output=output_file,
+        auxiliary_files=[input_a],
+        config=config_file,
+        logger=logger,
+    )
+
+    assert "Post-translation processing complete." in caplog.text
 
 
 def test_stacker_main_requires_auxiliary_files(tmp_path: Path):

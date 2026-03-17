@@ -35,12 +35,12 @@ The following migration steps are now implemented in this repository:
 - `post_translation_operation_hdf5_stacker.py` and `processstep_calc_beam_flux_and_transmissions.py` now also use explicit validation exceptions instead of runtime `assert` statements in active runtime paths.
 - `processstep_determine_beam_center.py`, `processstep_thickness_from_absorption.py`, and `processstep_stacker.py` no longer write progress/debug information to stdout; they now use logger output instead.
 - Active `skimage` deprecation warnings have been addressed by updating beam-feature cleanup and weighted-centroid access to the current API.
-- Active step execution now uses per-repetition child loggers, and the remaining root-logger usage in active runtime paths has been reduced.
+- Active step execution now uses per-repetition child loggers, and the standalone `post_translation_operation_hdf5_stacker.py` script now also uses an explicit module/logger path instead of direct root-logger calls.
 - `ruff`, `pre-commit`, and a repo-level `.pre-commit-config.yaml` have been added for incremental linting and formatting on touched files.
 - `pyproject.toml` now exposes the linting tools both as a `pip` extra and as a `uv` dependency group.
 - `periodictable` and `xraydb` are now declared directly as runtime dependencies because the `mouse_logbook` metadata writer requires them during chemistry and X-ray validation.
 - The removed obsolete modules are no longer referenced from `pyproject.toml`.
-- The current local test suite passes: 30 tests.
+- The current local test suite passes: 31 tests.
 
 What is still transitional:
 
@@ -112,6 +112,7 @@ Partially complete.
   - beam-center smoke testing with a synthetic detector image
   - quiet execution for stacker, thickness, and beam-center steps without stray stdout output
   - per-repetition log-file creation and opt-out behavior in `DirectoryProcessor`
+  - explicit logger-path usage in the standalone stacker script
 - The remaining packaging gap is full fresh-environment validation including dependency resolution from scratch.
 
 ### Linting Status
@@ -203,7 +204,7 @@ The migration can be considered complete when all of the following are true:
 The highest-value next implementation step is:
 
 1. expand `pytest` coverage to selected real processing steps with small-file smoke tests
-2. finish centralizing logger usage in the remaining standalone/utility code paths that still use ad hoc module/root loggers
+2. improve the command-line interface and README so the modern entry points, logging behavior, and common workflows are clearer
 3. keep using `pre-commit` on touched files and gradually widen `ruff` coverage once the touched-file workflow stays stable
 4. collect and review real profiling output from representative batches
 5. validate a clean install path with full dependency resolution in a fresh environment
