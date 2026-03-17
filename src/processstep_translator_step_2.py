@@ -1,10 +1,9 @@
 from pathlib import Path
 import subprocess
+import logging
 from YMD_class import extract_metadata_from_path
-from checkers import len_files_in_path, processing_possible
 from defaults_carrier import DefaultsCarrier
 from logbook_support import LogbookReaderLike
-import logging
 
 # Flag indicating whether this process step can be executed in parallel on multiple repetitions
 can_process_repetitions_in_parallel = True
@@ -23,13 +22,11 @@ def can_run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: LogbookRe
 
 def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: LogbookReaderLike | None, logger: logging.Logger):
     """
-    Executes the first translator processing step.
+    Executes the second translator processing step.
     """
     ymd, batch, repetition = extract_metadata_from_path(dir_path)
     try:
-
-        # encode: python3 -m HDF5Translator -C BAM_new_MOUSE_dectris_adder_configuration.yaml -I ./20250101_17_0/eiger_3_master.h5 -T ./20250101_17_0/testBAM.nxs -O ./20250101_17_0/testBAM_Dadd.nxs -d
-
+        del logbook_reader
         input_file = next(dir_path.glob('eiger_*_master.h5'), None)
         template_file = dir_path / f'MOUSE_{ymd}_{batch}_{repetition}_step_1.nxs'
         output_file = dir_path / f'MOUSE_{ymd}_{batch}_{repetition}.nxs'
@@ -46,10 +43,8 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: LogbookReader
         logger.debug(result.stdout)
         logger.info(f"Completed translator step 2 for {input_file}")
     except subprocess.CalledProcessError as e:
-        # Print the standard output and standard error
         logger.info("Subprocess failed with stderr:")
         logger.info(e.stderr)
-        # Optionally, also print the standard output
         logger.info("Subprocess output was:")
         logger.info(e.stdout)
         logger.error(f"Error during translator subprocess: {e}")
