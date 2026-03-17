@@ -16,3 +16,6 @@ logbook_file: "/Users/bpauw/Documents/BAM/Measurements/newMouseTest/Measurements
 
 # Emit lightweight timing logs for each processing step and batch.
 profile_steps: true
+
+# Write a small per-repetition log file next to each generated MOUSE_*.nxs file.
+log_per_datafile: true

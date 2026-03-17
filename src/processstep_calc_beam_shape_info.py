@@ -53,7 +53,10 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: LogbookReader
 
         # compute the needed values:
         _, _, _, _, sigma_minor, sigma_major, theta, _ = dynamic_beam_analysis(
-            DirectBeamData, coverage=0.997, beam_coverage_mask=None
+            DirectBeamData,
+            coverage=0.997,
+            beam_coverage_mask=None,
+            logger=logger,
         )
         # print(f'{repetition=}, {ITotal_overall/DirectBeamDuration=:0.02f}, {ITotal_region/DirectBeamDuration=:0.02f} int over {DirectBeamDuration=:0.02f}s')
 

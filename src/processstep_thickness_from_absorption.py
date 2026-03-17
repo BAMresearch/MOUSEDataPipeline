@@ -65,12 +65,12 @@ def get_background_file(filename: Path, logger: logging.Logger) -> Union[Path, N
     # make it relative to the current file
     if background_file:
         background_file = (filename.parent / background_file).resolve()
-        logging.info(f" * * * background file {background_file=} specified for sample file {filename=}")
+        logger.info(f" * * * background file {background_file=} specified for sample file {filename=}")
     if background_file and Path(background_file).is_file():
-        logging.info("background file exists")
+        logger.info("background file exists")
         return Path(background_file)
     else:
-        logging.info(f" * * * Did not find {background_file=} for {filename=}")
+        logger.info(f" * * * Did not find {background_file=} for {filename=}")
         return None
 
 

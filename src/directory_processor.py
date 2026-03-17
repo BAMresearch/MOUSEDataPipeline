@@ -1,6 +1,8 @@
 import concurrent.futures
+import hashlib
 import importlib
 import logging
+import threading
 from pathlib import Path
 from time import perf_counter
 from typing import List, Optional, Tuple
@@ -22,6 +24,8 @@ class DirectoryProcessor:
     logbook_reader: LogbookReaderLike | None = attrs.field(init=False, default=None)
     logger: logging.Logger = attrs.field(init=False, default=None)
     steps: List[str] = attrs.field(factory=list)  # List of processing step module names
+    _directory_loggers: dict[Path, logging.Logger] = attrs.field(init=False, factory=dict, repr=False)
+    _logger_lock: threading.Lock = attrs.field(init=False, factory=threading.Lock, repr=False)
 
     def __attrs_post_init__(self):
         """
@@ -34,6 +38,33 @@ class DirectoryProcessor:
     def _log_profile(self, message: str, *args):
         if self.defaults.profile_steps:
             self.logger.info("PROFILE " + message, *args)
+
+    def _get_directory_logger(self, dir_path: Path) -> logging.Logger:
+        if not self.defaults.log_per_datafile:
+            return self.logger
+
+        resolved_dir = dir_path.resolve()
+        with self._logger_lock:
+            existing_logger = self._directory_loggers.get(resolved_dir)
+            if existing_logger is not None:
+                return existing_logger
+
+            ymd, batch, repetition = extract_metadata_from_path(resolved_dir)
+            log_file = resolved_dir / f"MOUSE_{ymd}_{batch}_{repetition}.processing.log"
+            logger_name = f"{self.logger.name}.dir.{hashlib.sha1(str(resolved_dir).encode('utf-8')).hexdigest()[:12]}"
+            directory_logger = logging.getLogger(logger_name)
+            directory_logger.setLevel(logging.DEBUG)
+            directory_logger.propagate = True
+
+            resolved_log_file = log_file.resolve()
+            if not any(
+                isinstance(handler, logging.FileHandler) and Path(handler.baseFilename) == resolved_log_file
+                for handler in directory_logger.handlers
+            ):
+                directory_logger.addHandler(self.defaults.build_file_handler(resolved_log_file, level=logging.DEBUG))
+
+            self._directory_loggers[resolved_dir] = directory_logger
+            return directory_logger
 
     def _get_logbook_reader(self) -> LogbookReaderLike:
         if self.logbook_reader is None:
@@ -61,13 +92,14 @@ class DirectoryProcessor:
             single_dir, ymd, batch, repetition = self._resolve_directory(
                 single_dir=single_dir, ymd=ymd, batch=batch, repetition=repetition
             )
+            directory_logger = self._get_directory_logger(single_dir)
 
-            self.logger.info(f"Starting processing for directory: {single_dir}")
+            directory_logger.info(f"Starting processing for directory: {single_dir}")
 
             for step_name in self.steps:
                 self._run_processing_step(step_name, single_dir, ymd, batch, repetition)
 
-            self.logger.info(f"Completed processing for directory: {single_dir}, with steps: {self.steps}")
+            directory_logger.info(f"Completed processing for directory: {single_dir}, with steps: {self.steps}")
             self._log_profile(
                 "process_directory dir=%s elapsed=%.3fs",
                 single_dir,
@@ -75,7 +107,12 @@ class DirectoryProcessor:
             )
 
         except Exception as e:
-            self.logger.error(f"Error processing directory: {single_dir}. Exception: {e}")
+            error_logger = (
+                self._get_directory_logger(single_dir)
+                if single_dir is not None and single_dir.is_dir()
+                else self.logger
+            )
+            error_logger.error(f"Error processing directory: {single_dir}. Exception: {e}")
             raise
 
     def process_batch(self, ymd: str, batch: int, parallel: bool = False):
@@ -87,16 +124,16 @@ class DirectoryProcessor:
             step_started_at = perf_counter()
             step_module = importlib.import_module(step_name)
             if not getattr(step_module, "can_process_repetitions_in_parallel", False):
-                logging.info(f"{step_module} cannot process repetitions in parallel.")
+                self.logger.info(f"{step_module} cannot process repetitions in parallel.")
                 # Run this step sequentially
                 for directory in directories:
                     self._run_processing_step(step_name, directory, ymd, batch, None)
             elif parallel:
-                logging.info(f"using {step_module} to process repetitions in parallel.")
+                self.logger.info(f"using {step_module} to process repetitions in parallel.")
                 # Run this step in parallel
                 self._run_steps_in_parallel(step_name, directories, ymd, batch)
             else:
-                logging.info(f"{step_module} can process repetitions in parallel, but not requested.")
+                self.logger.info(f"{step_module} can process repetitions in parallel, but not requested.")
                 for directory in directories:
                     self._run_processing_step(step_name, directory, ymd, batch, None)
             self._log_profile(
@@ -170,17 +207,18 @@ class DirectoryProcessor:
         Dynamically loads and runs a processing step module with logging.
         """
         step_started_at = perf_counter()
+        step_logger = self._get_directory_logger(dir_path)
         try:
             module = importlib.import_module(step_name)
             logbook_reader = self._get_logbook_reader() if getattr(module, "requires_logbook_reader", False) else None
             if hasattr(module, "can_run") and hasattr(module, "run"):
                 can_run_started_at = perf_counter()
-                should_run = module.can_run(dir_path, self.defaults, logbook_reader, self.logger)
+                should_run = module.can_run(dir_path, self.defaults, logbook_reader, step_logger)
                 can_run_elapsed = perf_counter() - can_run_started_at
                 if should_run:
-                    self.logger.info(f"Running step: {step_name}")
+                    step_logger.info(f"Running step: {step_name}")
                     run_started_at = perf_counter()
-                    module.run(dir_path, self.defaults, logbook_reader, self.logger)
+                    module.run(dir_path, self.defaults, logbook_reader, step_logger)
                     run_elapsed = perf_counter() - run_started_at
                     self._log_profile(
                         "step=%s dir=%s can_run=%.3fs run=%.3fs total=%.3fs",
@@ -191,7 +229,7 @@ class DirectoryProcessor:
                         perf_counter() - step_started_at,
                     )
                 else:
-                    self.logger.info(f"Step skipped: {step_name}")
+                    step_logger.info(f"Step skipped: {step_name}")
                     self._log_profile(
                         "step=%s dir=%s skipped can_run=%.3fs total=%.3fs",
                         step_name,
@@ -200,9 +238,9 @@ class DirectoryProcessor:
                         perf_counter() - step_started_at,
                     )
             else:
-                self.logger.error(f"Module {step_name} must define 'can_run' and 'run' functions.")
+                step_logger.error(f"Module {step_name} must define 'can_run' and 'run' functions.")
         except Exception as e:
-            self.logger.error(f"Error in step {step_name}: {e}")
+            step_logger.error(f"Error in step {step_name}: {e}")
             raise
 
 

@@ -52,6 +52,59 @@ def test_directory_processor_runs_non_reader_step_without_building_reader(mini_d
     assert "PROFILE step=fake_step" in caplog.text
 
 
+def test_directory_processor_writes_per_datafile_log(mini_dataset, monkeypatch):
+    processor = DirectoryProcessor(defaults=mini_dataset.defaults, steps=["fake_step"])
+
+    fake_module = SimpleNamespace(
+        requires_logbook_reader=False,
+        can_run=lambda dir_path, defaults, logbook_reader, logger: True,
+        run=lambda dir_path, defaults, logbook_reader, logger: logger.info("fake step body"),
+    )
+
+    monkeypatch.setattr(
+        directory_processor,
+        "importlib",
+        SimpleNamespace(import_module=lambda name: fake_module),
+    )
+
+    processor.process_directory(single_dir=mini_dataset.repetition_dir)
+
+    log_file = (
+        mini_dataset.repetition_dir
+        / f"MOUSE_{mini_dataset.ymd}_{mini_dataset.batch_num}_{mini_dataset.repetition}.processing.log"
+    )
+    assert log_file.is_file()
+    log_text = log_file.read_text(encoding="utf-8")
+    assert "Starting processing for directory" in log_text
+    assert "Running step: fake_step" in log_text
+    assert "fake step body" in log_text
+
+
+def test_directory_processor_can_disable_per_datafile_logs(mini_dataset, monkeypatch):
+    mini_dataset.defaults.log_per_datafile = False
+    processor = DirectoryProcessor(defaults=mini_dataset.defaults, steps=["fake_step"])
+
+    fake_module = SimpleNamespace(
+        requires_logbook_reader=False,
+        can_run=lambda dir_path, defaults, logbook_reader, logger: True,
+        run=lambda dir_path, defaults, logbook_reader, logger: logger.info("fake step body"),
+    )
+
+    monkeypatch.setattr(
+        directory_processor,
+        "importlib",
+        SimpleNamespace(import_module=lambda name: fake_module),
+    )
+
+    processor.process_directory(single_dir=mini_dataset.repetition_dir)
+
+    log_file = (
+        mini_dataset.repetition_dir
+        / f"MOUSE_{mini_dataset.ymd}_{mini_dataset.batch_num}_{mini_dataset.repetition}.processing.log"
+    )
+    assert not log_file.exists()
+
+
 def test_directory_processor_omits_profile_logs_when_disabled(mini_dataset, monkeypatch, caplog):
     mini_dataset.defaults.profile_steps = False
     processor = DirectoryProcessor(defaults=mini_dataset.defaults, steps=["fake_step"])

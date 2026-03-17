@@ -24,7 +24,10 @@ can_process_repetitions_in_parallel = True
 
 
 def dynamic_beam_analysis(
-    imageData: np.ndarray, coverage: float = 0.997, beam_coverage_mask: Optional[np.ndarray] = None
+    imageData: np.ndarray,
+    coverage: float = 0.997,
+    beam_coverage_mask: Optional[np.ndarray] = None,
+    logger: logging.Logger | None = None,
 ) -> Union[tuple, float, np.ndarray]:
     """
     This method is used to calculate the beam mask and properties based on either a provided mask or
@@ -96,7 +99,8 @@ def dynamic_beam_analysis(
 
     # if we don't have a mask yet, we need to determine one (for direct_beam only. sample_beam should use the direct beam mask)
     # Step 1: get rid of masked or pegged pixels on an Eiger detector
-    maskedTwoDImage = prepare_eiger_image(imageData, logging.getLogger())
+    logger = logger or logging.getLogger(__name__)
+    maskedTwoDImage = prepare_eiger_image(imageData, logger)
     sigma_minor, sigma_major, theta = None, None, None
     if beam_coverage_mask is not None:
         if beam_coverage_mask.shape != maskedTwoDImage.shape:
@@ -104,7 +108,7 @@ def dynamic_beam_analysis(
         beam_coverage_mask = beam_coverage_mask.astype(int)
         achieved_coverage = None  # we assume the provided mask is good enough
     else:
-        labels = label_main_feature(maskedTwoDImage, logging.getLogger())
+        labels = label_main_feature(maskedTwoDImage, logger)
         # step 4: calculate region properties
         properties = regionprops(labels, maskedTwoDImage)  # calculate initial region properties
 
@@ -120,7 +124,7 @@ def dynamic_beam_analysis(
         beam_coverage_mask = (md2 <= k * k) & (labels > 0)
         kept_intensity = float(maskedTwoDImage[beam_coverage_mask].sum())
         achieved_coverage = kept_intensity / properties[0].intensity_image.sum()
-        logging.getLogger(__name__).debug(
+        logger.debug(
             "Refined k=%.3f to achieve coverage %.4f (coverage_target=%.4f)",
             k,
             achieved_coverage,
@@ -226,11 +230,14 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: LogbookReader
 
         # now we calculate the estimate for the multiple scattering based on a tight beam mask on the direct beam image:
         _, _, _, tightBeamMask, _, _, _, achieved_coverage = dynamic_beam_analysis(
-            DirectBeamData, coverage=target_coverage, beam_coverage_mask=None
+            DirectBeamData, coverage=target_coverage, beam_coverage_mask=None, logger=logger
         )
         # and determine the fluxes in the sample beam image under that mask:
         _, sample_tight_beam_flux, sample_overall_flux, _, _, _, _, _ = dynamic_beam_analysis(
-            SampleBeamData, coverage=target_coverage, beam_coverage_mask=tightBeamMask
+            SampleBeamData,
+            coverage=target_coverage,
+            beam_coverage_mask=tightBeamMask,
+            logger=logger,
         )
         scattering_probability_estimate = (sample_overall_flux - sample_tight_beam_flux) / sample_overall_flux
 

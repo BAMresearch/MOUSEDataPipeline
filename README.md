@@ -106,6 +106,7 @@ The configuration file also supports:
 
 - `profile_steps: true` to emit lightweight timing logs per step and per batch
 - `logging_level: INFO` to make the profiling output visible during runs
+- `log_per_datafile: true` to write a `MOUSE_<ymd>_<batch>_<repetition>.processing.log` file next to each repetition output
 
 # usage example:
 

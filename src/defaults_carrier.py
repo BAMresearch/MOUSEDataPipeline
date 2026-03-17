@@ -73,9 +73,11 @@ class DefaultsCarrier:
 
     logging_level: str = attrs.field(default="INFO", converter=str)
     profile_steps: bool = attrs.field(default=True)
+    log_per_datafile: bool = attrs.field(default=True)
     log_to_file: bool = attrs.field(default=False)
     log_file: Optional[Path] = attrs.field(default=None, converter=convert_to_path_or_none)
     logger: logging.Logger = attrs.field(init=False)
+    _log_formatter: logging.Formatter = attrs.field(init=False, repr=False)
 
     def __attrs_post_init__(self):
         """
@@ -99,20 +101,33 @@ class DefaultsCarrier:
         """
         Configure logging for the carrier.
         """
+        self._log_formatter = logging.Formatter(
+            "%(asctime)s %(levelname)s [%(threadName)s] %(name)s: %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
+        )
         self.logger = logging.getLogger("DefaultsCarrier")
         self.logger.handlers.clear()
-        self.logger.setLevel(self.logging_level.upper())
+        self.logger.setLevel(logging.DEBUG)
+
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(self.logging_level.upper())
+        console_handler.setFormatter(self._log_formatter)
+        self.logger.addHandler(console_handler)
 
         if self.log_to_file:
             if not self.log_file:
                 raise ValueError("Log file path must be provided when log_to_file is enabled.")
-            # Ensure the directory for the log file exists
-            self.log_file.parent.mkdir(parents=True, exist_ok=True)
-            file_handler = logging.FileHandler(self.log_file)
-            self.logger.addHandler(file_handler)
-        else:
-            console_handler = logging.StreamHandler()
-            self.logger.addHandler(console_handler)
+            self.logger.addHandler(self.build_file_handler(self.log_file, level=self.logging_level.upper()))
+
+    def build_file_handler(self, log_file: Path, level: int | str = logging.DEBUG) -> logging.FileHandler:
+        """
+        Create a consistently formatted file handler for pipeline logs.
+        """
+        log_file.parent.mkdir(parents=True, exist_ok=True)
+        file_handler = logging.FileHandler(log_file, encoding="utf-8")
+        file_handler.setLevel(level)
+        file_handler.setFormatter(self._log_formatter)
+        return file_handler
 
 
 # Factory Function
@@ -139,6 +154,7 @@ def create_defaults_carrier_from_config(config_file: Optional[str] = None) -> De
         projects_dir=config.get("projects_dir", None),
         logging_level=config.get("logging_level", "INFO"),
         profile_steps=config.get("profile_steps", True),
+        log_per_datafile=config.get("log_per_datafile", True),
         log_to_file=config.get("log_to_file", False),
         log_file=config.get("log_file", None),
     )

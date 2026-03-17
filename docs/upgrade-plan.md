@@ -22,10 +22,12 @@ The following migration steps are now implemented in this repository:
 - `src/processstep_metadata_update.py` now also writes `/entry1/sample/sampleowner` as a compatibility alias from the CLI-written `/entry1/sample/owner`.
 - `src/processstep_translator_step_2.py` continues to shell out to `python3 -m HDF5Translator`.
 - `src/directory_processor.py` now emits lightweight per-step timing logs when profiling is enabled.
+- `src/directory_processor.py` now also creates per-repetition log files alongside generated `MOUSE_*.nxs` outputs when `log_per_datafile` is enabled.
 - `pytest.ini`, `requirements-dev.txt`, and a first `tests/` suite have been added.
 - `pyproject.toml` now provides package metadata, dependencies, and a `mouse-directory-processor` console entry point.
 - `requirements-dev.txt` now installs the project in editable mode through `-e .[dev]`.
 - `MOUSE_settings.yaml` now documents the `profile_steps` toggle.
+- `MOUSE_settings.yaml` and `README.md` now document `log_per_datafile`.
 - `tests/` now also covers realistic Excel fixtures from `mouse_logbook/tests/data`.
 - `DirectoryProcessor` and `YMD_class` now use explicit exceptions for core path/argument validation instead of runtime `assert` statements.
 - The `repetition=0` orchestration path now works correctly instead of being rejected by truthiness checks.
@@ -33,11 +35,12 @@ The following migration steps are now implemented in this repository:
 - `post_translation_operation_hdf5_stacker.py` and `processstep_calc_beam_flux_and_transmissions.py` now also use explicit validation exceptions instead of runtime `assert` statements in active runtime paths.
 - `processstep_determine_beam_center.py`, `processstep_thickness_from_absorption.py`, and `processstep_stacker.py` no longer write progress/debug information to stdout; they now use logger output instead.
 - Active `skimage` deprecation warnings have been addressed by updating beam-feature cleanup and weighted-centroid access to the current API.
+- Active step execution now uses per-repetition child loggers, and the remaining root-logger usage in active runtime paths has been reduced.
 - `ruff`, `pre-commit`, and a repo-level `.pre-commit-config.yaml` have been added for incremental linting and formatting on touched files.
 - `pyproject.toml` now exposes the linting tools both as a `pip` extra and as a `uv` dependency group.
 - `periodictable` and `xraydb` are now declared directly as runtime dependencies because the `mouse_logbook` metadata writer requires them during chemistry and X-ray validation.
 - The removed obsolete modules are no longer referenced from `pyproject.toml`.
-- The current local test suite passes: 28 tests.
+- The current local test suite passes: 30 tests.
 
 What is still transitional:
 
@@ -108,6 +111,7 @@ Partially complete.
   - explicit validation failure for a mismatched beam-coverage mask in `processstep_calc_beam_flux_and_transmissions`
   - beam-center smoke testing with a synthetic detector image
   - quiet execution for stacker, thickness, and beam-center steps without stray stdout output
+  - per-repetition log-file creation and opt-out behavior in `DirectoryProcessor`
 - The remaining packaging gap is full fresh-environment validation including dependency resolution from scratch.
 
 ### Linting Status
@@ -199,7 +203,7 @@ The migration can be considered complete when all of the following are true:
 The highest-value next implementation step is:
 
 1. expand `pytest` coverage to selected real processing steps with small-file smoke tests
-2. centralize logger usage so helper functions and process steps consistently use the passed step logger instead of ad hoc module/root loggers
+2. finish centralizing logger usage in the remaining standalone/utility code paths that still use ad hoc module/root loggers
 3. keep using `pre-commit` on touched files and gradually widen `ruff` coverage once the touched-file workflow stays stable
 4. collect and review real profiling output from representative batches
 5. validate a clean install path with full dependency resolution in a fresh environment
