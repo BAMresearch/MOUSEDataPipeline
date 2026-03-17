@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
 import directory_processor
-from YMD_class import YMD
+from YMD_class import YMD, extract_metadata_from_path
 from directory_processor import DirectoryProcessor
 
 
@@ -107,3 +108,48 @@ def test_directory_processor_propagates_parallel_step_errors(mini_dataset, monke
 
     with pytest.raises(RuntimeError, match="parallel step failed"):
         processor.process_batch(mini_dataset.ymd, mini_dataset.batch_num, parallel=True)
+
+
+def test_directory_processor_resolve_directory_accepts_repetition_zero(mini_dataset):
+    processor = DirectoryProcessor(defaults=mini_dataset.defaults, steps=[])
+
+    resolved_dir, ymd, batch, repetition = processor._resolve_directory(
+        single_dir=None,
+        ymd=mini_dataset.ymd,
+        batch=mini_dataset.batch_num,
+        repetition=0,
+    )
+
+    assert resolved_dir == mini_dataset.repetition_dir
+    assert ymd.YMD == mini_dataset.ymd
+    assert batch == mini_dataset.batch_num
+    assert repetition == 0
+
+
+def test_directory_processor_resolve_directory_requires_complete_coordinates(mini_dataset):
+    processor = DirectoryProcessor(defaults=mini_dataset.defaults, steps=[])
+
+    with pytest.raises(ValueError, match="Either single_dir or ymd, batch, and repetition must be provided."):
+        processor._resolve_directory(
+            single_dir=None,
+            ymd=mini_dataset.ymd,
+            batch=mini_dataset.batch_num,
+            repetition=None,
+        )
+
+
+def test_directory_processor_resolve_directory_raises_for_missing_path(mini_dataset):
+    processor = DirectoryProcessor(defaults=mini_dataset.defaults, steps=[])
+
+    with pytest.raises(FileNotFoundError, match="Provided path is not an existing directory"):
+        processor._resolve_directory(
+            single_dir=mini_dataset.repetition_dir / "does_not_exist",
+            ymd=None,
+            batch=None,
+            repetition=None,
+        )
+
+
+def test_extract_metadata_from_path_raises_value_error_for_invalid_format():
+    with pytest.raises(ValueError, match="Invalid directory format"):
+        extract_metadata_from_path(Path("invalid-directory-name"))

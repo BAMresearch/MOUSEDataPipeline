@@ -17,6 +17,9 @@ if str(SRC) not in sys.path:
 from defaults_carrier import DefaultsCarrier
 
 
+EXAMPLE_MOUSE_LOGBOOK_DATA_DIR = ROOT.parent / "mouse_logbook" / "tests" / "data"
+
+
 def _write_logbook_xlsx(path: Path, ymd: str, batch_num: int, proposal_id: str, sample_id: int, sampos: str):
     logbook_df = pd.DataFrame(
         [
@@ -162,4 +165,70 @@ def mini_dataset(tmp_path: Path):
         output_file=output_file,
         project_file=project_file,
         logbook_file=logbook_file,
+    )
+
+
+@pytest.fixture
+def mouse_logbook_example_dataset(tmp_path: Path):
+    data_dir = EXAMPLE_MOUSE_LOGBOOK_DATA_DIR
+    logbook_file = data_dir / "example_logbook.xlsx"
+    projects_dir = data_dir / "projects"
+    if not logbook_file.is_file() or not projects_dir.is_dir():
+        pytest.skip(f"mouse_logbook example fixtures not available at {data_dir}")
+
+    ymd = "20251220"
+    batch_num = 2
+    repetition = 0
+
+    vsi_root = tmp_path / "vsi"
+    saxs_dir = vsi_root / "Measurements" / "SAXS002"
+    post_translation_dir = tmp_path / "post_translation"
+    translator_template_dir = tmp_path / "translator_templates"
+    data_root = tmp_path / "data"
+    masks_dir = data_root / "Masks"
+    stacker_config_dir = data_root / "StackerConfigurations"
+    stacker_config_file = stacker_config_dir / "stacker_config.yaml"
+
+    for path in (
+        vsi_root,
+        saxs_dir,
+        post_translation_dir,
+        translator_template_dir,
+        data_root,
+        masks_dir,
+        stacker_config_dir,
+    ):
+        path.mkdir(parents=True, exist_ok=True)
+
+    stacker_config_file.write_text("{}", encoding="utf-8")
+
+    repetition_dir = data_root / ymd[:4] / ymd / f"{ymd}_{batch_num}_{repetition}"
+    repetition_dir.mkdir(parents=True, exist_ok=True)
+    output_file = repetition_dir / f"MOUSE_{ymd}_{batch_num}_{repetition}.nxs"
+    with h5py.File(output_file, "w"):
+        pass
+
+    defaults = DefaultsCarrier(
+        vsi_root=vsi_root,
+        saxs_dir=saxs_dir,
+        post_translation_dir=post_translation_dir,
+        translator_template_dir=translator_template_dir,
+        data_dir=data_root,
+        masks_dir=masks_dir,
+        projects_dir=projects_dir,
+        logbook_file=logbook_file,
+        stacker_config_file=stacker_config_file,
+        logging_level="INFO",
+        profile_steps=True,
+    )
+
+    return SimpleNamespace(
+        defaults=defaults,
+        ymd=ymd,
+        batch_num=batch_num,
+        repetition=repetition,
+        repetition_dir=repetition_dir,
+        output_file=output_file,
+        logbook_file=logbook_file,
+        projects_dir=projects_dir,
     )

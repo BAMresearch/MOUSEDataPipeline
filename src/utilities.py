@@ -110,7 +110,8 @@ def get_configuration(filename: Path, logger: logging.Logger) -> int:
 
 
 def reduce_extra_image_dimensions(image: np.ndarray, method=np.mean) -> np.ndarray:
-    assert method in [np.mean, np.sum, np.any, np.all], "method must be either np.mean or np.sum function handles"
+    if method not in [np.mean, np.sum, np.any, np.all]:
+        raise ValueError("method must be one of np.mean, np.sum, np.any, or np.all")
     while image.ndim > 2:
         image = method(image, axis=0)
     return image
@@ -169,7 +170,7 @@ def label_main_feature(maskedTwoDImage: np.ndarray, logger: logging.Logger) -> n
         # find the largest component and keep only that one
         largest_label = np.argmax(np.bincount(labels.flat)[1:]) + 1  # skip background label 0
         labels = (labels == largest_label).astype(int)
-    # assert we only have one labeled region now
-    assert np.unique(labels).size == 2, ValueError("More than one labeled region found in call to label_main_feature.")
+    if np.unique(labels).size != 2:
+        raise ValueError("More than one labeled region found in call to label_main_feature.")
 
     return labels

@@ -39,6 +39,7 @@ def extract_metadata_from_path(dir_path: Path) -> Tuple[YMD, int, int]:
         dir_path = dir_path.parent
     last_path = dir_path.parts[-1]
     parts = last_path.split('_')
-    assert len(parts) == 3, f"Invalid directory format: {dir_path}"
+    if len(parts) != 3:
+        raise ValueError(f"Invalid directory format: {dir_path}")
     ymd, batch, repetition = parts
     return YMD(ymd), int(batch), int(repetition)

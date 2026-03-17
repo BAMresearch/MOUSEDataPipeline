@@ -87,7 +87,10 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: LogbookReader
         sampleOffsetZ = get_pint_quantity_from_h5(input_file, sampleOffsetZPath, logger)
         distance = (detZ - sampleOffsetZ).to('m')
 
-        assert np.isfinite(distance.magnitude) and distance.magnitude > 0.0, f"invalid sample-detector distance {distance} from {detZPath} and {sampleOffsetZPath} in {input_file}"
+        if not (np.isfinite(distance.magnitude) and distance.magnitude > 0.0):
+            raise ValueError(
+                f"invalid sample-detector distance {distance} from {detZPath} and {sampleOffsetZPath} in {input_file}"
+            )
         # determine the appropriate diameter:
         diameter = diameter_from_distance(distance.magnitude, reference_distance_m=2.0, reference_diameter_in_px=600)
         mask = generate_mask(imShape, COM, diameter / 2, logger)

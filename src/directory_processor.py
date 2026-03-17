@@ -145,15 +145,18 @@ class DirectoryProcessor:
         Resolves and validates the input arguments to determine the directory path and metadata.
         """
         if single_dir:
-            assert single_dir.is_dir(), f"Provided path is not an existing directory: {single_dir}"
+            if not single_dir.is_dir():
+                raise FileNotFoundError(f"Provided path is not an existing directory: {single_dir}")
             ymd, batch, repetition = extract_metadata_from_path(single_dir)
         else:
-            assert ymd and batch and repetition, "Either single_dir or ymd, batch, and repetition must be provided."
+            if ymd is None or batch is None or repetition is None:
+                raise ValueError("Either single_dir or ymd, batch, and repetition must be provided.")
             ymd = YMD(ymd)
             batch = int(batch)
             repetition = int(repetition)
             single_dir = self._get_directory_path(ymd, batch, repetition)
-            assert single_dir.is_dir(), f"Directory does not exist: {single_dir}"
+            if not single_dir.is_dir():
+                raise FileNotFoundError(f"Directory does not exist: {single_dir}")
 
         return single_dir, ymd, batch, repetition
 
@@ -227,7 +230,7 @@ def main():
         steps=args.steps
     )
 
-    if args.single_dir or args.repetition:
+    if args.single_dir is not None or args.repetition is not None:
         processor.process_directory(
             single_dir=Path(args.single_dir) if args.single_dir else None,
             ymd=args.ymd,
@@ -235,7 +238,8 @@ def main():
             repetition=args.repetition
             )
     else:
-        assert args.ymd and args.batch, "Processing all repetitions requires YMD and batch."
+        if args.ymd is None or args.batch is None:
+            parser.error("Processing all repetitions requires YMD and batch.")
         processor.process_batch(
             ymd=args.ymd,
             batch=args.batch,

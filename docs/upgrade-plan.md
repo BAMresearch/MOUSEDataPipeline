@@ -26,7 +26,11 @@ The following migration steps are now implemented in this repository:
 - `pyproject.toml` now provides package metadata, dependencies, and a `mouse-directory-processor` console entry point.
 - `requirements-dev.txt` now installs the project in editable mode through `-e .[dev]`.
 - `MOUSE_settings.yaml` now documents the `profile_steps` toggle.
-- The current local test suite passes: 8 tests.
+- `tests/` now also covers realistic Excel fixtures from `mouse_logbook/tests/data`.
+- `DirectoryProcessor` and `YMD_class` now use explicit exceptions for core path/argument validation instead of runtime `assert` statements.
+- The `repetition=0` orchestration path now works correctly instead of being rejected by truthiness checks.
+- `utilities.py`, `processstep_thickness_from_absorption.py`, and `processstep_make_beam_mask.py` now use explicit validation exceptions instead of runtime `assert` statements in their core guard rails.
+- The current local test suite passes: 20 tests.
 
 What is still transitional:
 
@@ -81,8 +85,16 @@ Partially complete.
   - metadata updates via the `mouse-logbook` CLI writer path
   - metadata CLI failure propagation
   - `DirectoryProcessor` startup without eager reader construction
+  - explicit `DirectoryProcessor` validation errors for missing coordinates and missing paths
+  - path parsing validation in `YMD_class.extract_metadata_from_path`
+  - utility validation failures in `reduce_extra_image_dimensions` and `label_main_feature`
   - reader initialization against a small Excel fixture
+  - reader initialization against realistic `mouse_logbook` example sheets
+  - metadata export against realistic `mouse_logbook` example sheets and a synthetic `.nxs` file
   - translator step 2 subprocess dispatch
+  - background-file metadata writing with a synthetic `.nxs` file
+  - cleanup of intermediate step-1 output files
+  - explicit validation failures in `processstep_thickness_from_absorption` and `processstep_make_beam_mask`
 - The remaining packaging gap is full fresh-environment validation including dependency resolution from scratch.
 
 ## Phase 2: Expand Test Coverage
@@ -101,7 +113,7 @@ The first `pytest` scaffolding is in place. The next step is to cover the main f
    - Add one or two small-file tests for high-value steps that do not need the full production dataset.
 5. Reader-fixture coverage.
    - Keep the Excel fixtures small, explicit, and isolated from the real corpus.
-   - Example logbook/project sheets from `mouse_logbook` tests are now available and should be folded into regression coverage.
+   - Example logbook/project sheets from `mouse_logbook` tests are now folded into regression coverage.
 
 ### Exit Criteria
 
@@ -111,7 +123,7 @@ The first `pytest` scaffolding is in place. The next step is to cover the main f
 ### Status
 
 - In progress.
-- Current tests cover the happy path for metadata writing, metadata CLI failure propagation, lazy reader construction, profiling enable/disable behavior, parallel-error propagation, reader initialization on a small fixture, and translator step 2 subprocess dispatch.
+- Current tests cover the happy path for metadata writing, metadata CLI failure propagation, lazy reader construction, profiling enable/disable behavior, parallel-error propagation, reader initialization on both synthetic and realistic Excel fixtures, metadata export using realistic Excel fixtures plus a synthetic `.nxs` file, and translator step 2 subprocess dispatch.
 - The biggest gaps are step-specific smoke tests and broader orchestration coverage.
 
 ## Phase 3: Runtime Robustness Cleanup
@@ -120,7 +132,7 @@ These are maintainability improvements that should now be done against the migra
 
 ### Recommended cleanup items
 
-1. Replace runtime `assert` statements with explicit exceptions and user-facing validation errors.
+1. Continue replacing runtime `assert` statements with explicit exceptions and user-facing validation errors in the remaining data-processing and stacking modules.
 2. Centralize logging setup instead of relying on implicit logger reuse.
 3. Remove any remaining `print(...)` debugging from runtime paths.
 4. Consider a small step registry instead of raw `importlib.import_module(...)` strings once the pipeline behavior is better covered by tests.
@@ -164,8 +176,8 @@ The migration can be considered complete when all of the following are true:
 The highest-value next implementation step is:
 
 1. expand `pytest` coverage to selected real processing steps with small-file smoke tests
-2. collect and review real profiling output from representative batches
-3. replace runtime `assert` statements with explicit validation errors in the orchestration layer
+2. continue replacing runtime `assert` statements with explicit validation errors in the remaining utility, beam-analysis, and stacking modules
+3. collect and review real profiling output from representative batches
 4. validate a clean install path with full dependency resolution in a fresh environment
 
 The dependency swap is complete in code. The remaining work is now testing, packaging, and cleanup.

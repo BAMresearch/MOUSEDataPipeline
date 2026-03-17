@@ -33,6 +33,25 @@ def test_metadata_update_cli_writer_updates_nexus_file(mini_dataset):
         assert _read_scalar_string(h5f["/entry1/processing_required_metadata/procpipeline"]) == "test-pipeline"
 
 
+def test_metadata_update_cli_writer_updates_nexus_file_from_example_mouse_logbook(mouse_logbook_example_dataset):
+    processstep_metadata_update.run(
+        mouse_logbook_example_dataset.repetition_dir,
+        mouse_logbook_example_dataset.defaults,
+        logbook_reader=None,
+        logger=mouse_logbook_example_dataset.defaults.logger,
+    )
+
+    with h5py.File(mouse_logbook_example_dataset.output_file, "r") as h5f:
+        assert "/entry1/sample/sampleowner" in h5f
+        assert _read_scalar_string(h5f["/entry1/sample/sampleowner"]) == "Test user"
+        assert "/entry1/proposal/proposalid" in h5f
+        assert _read_scalar_string(h5f["/entry1/proposal/proposalid"]) == "2025002"
+        assert "/entry1/sample/name" in h5f
+        assert _read_scalar_string(h5f["/entry1/sample/name"]) == "Vacuum"
+        assert "/entry1/processing_required_metadata/procpipeline" in h5f
+        assert _read_scalar_string(h5f["/entry1/processing_required_metadata/procpipeline"]) == "20251010_standard_logq.nxs"
+
+
 def test_metadata_update_cli_writer_failure_propagates(mini_dataset, monkeypatch):
     monkeypatch.setattr(
         processstep_metadata_update,

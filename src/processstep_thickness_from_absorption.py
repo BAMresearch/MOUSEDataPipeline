@@ -75,7 +75,8 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: LogbookReader
     """
     ymd, batch, repetition = extract_metadata_from_path(dir_path)
     input_file = dir_path / f'MOUSE_{ymd}_{batch}_{repetition}.nxs'
-    assert input_file.is_file(), f"Input file {input_file} does not exist"
+    if not input_file.is_file():
+        raise FileNotFoundError(f"Input file {input_file} does not exist")
 
     try:
         logger.info(f"Starting thickness_from_absorption step for {input_file}")
