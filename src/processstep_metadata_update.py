@@ -15,7 +15,7 @@ using the mouse_logbook CLI writer.
 """
 
 # Flag indicating whether this process step can be executed in parallel on multiple repetitions
-can_process_repetitions_in_parallel = False
+can_process_repetitions_in_parallel = True
 
 
 def can_run(
