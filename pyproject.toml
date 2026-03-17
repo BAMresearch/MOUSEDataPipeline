@@ -1,0 +1,62 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mousedatapipeline"
+version = "0.1.0"
+description = "Preprocessing pipeline for MOUSE data before correction."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "attrs",
+    "h5py",
+    "hdf5plugin",
+    "numpy",
+    "pint",
+    "PyYAML",
+    "scikit-image",
+    "HDF5Translator @ git+https://github.com/BAMresearch/HDF5Translator.git",
+    "mouse-logbook @ git+https://github.com/BAMresearch/mouse_logbook.git",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+]
+
+[project.scripts]
+mouse-directory-processor = "directory_processor:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+py-modules = [
+    "YMD_class",
+    "checkers",
+    "defaults_carrier",
+    "directory_processor",
+    "logbook_support",
+    "obsolete_post_translation_operation_MOUSE_beamanalysis",
+    "obsolete_post_translation_operation_MOUSE_beamcenter",
+    "post_translation_operation_hdf5_stacker",
+    "processstep_add_background_files",
+    "processstep_add_mask_file",
+    "processstep_apply_transmission_correction_factor",
+    "processstep_average_to_counts",
+    "processstep_beamanalysis",
+    "processstep_calc_beam_flux_and_transmissions",
+    "processstep_calc_beam_shape_info",
+    "processstep_cleanup_files",
+    "processstep_determine_beam_center",
+    "processstep_make_beam_mask",
+    "processstep_metadata_update",
+    "processstep_stacker",
+    "processstep_template",
+    "processstep_thickness_from_absorption",
+    "processstep_translator_step_1",
+    "processstep_translator_step_2",
+    "processstep_transmission_correction_factor_propagator",
+    "processstep_transmission_thickness_flux_table",
+    "utilities",
+    "watcher",
+]

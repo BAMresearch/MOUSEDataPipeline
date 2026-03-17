@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+from pathlib import Path
+import subprocess
+
 import h5py
+import pytest
 
 import processstep_metadata_update
 
@@ -27,3 +31,28 @@ def test_metadata_update_cli_writer_updates_nexus_file(mini_dataset):
         assert _read_scalar_string(h5f["/entry1/proposal/proposalid"]) == "2026001"
         assert "/entry1/processing_required_metadata/procpipeline" in h5f
         assert _read_scalar_string(h5f["/entry1/processing_required_metadata/procpipeline"]) == "test-pipeline"
+
+
+def test_metadata_update_cli_writer_failure_propagates(mini_dataset, monkeypatch):
+    monkeypatch.setattr(
+        processstep_metadata_update,
+        "_resolve_mouse_logbook_cli",
+        lambda: Path("/tmp/mouse-logbook"),
+    )
+
+    def fake_run(*args, **kwargs):
+        raise subprocess.CalledProcessError(
+            returncode=2,
+            cmd=kwargs.get("args", args[0] if args else []),
+            stderr="simulated failure",
+        )
+
+    monkeypatch.setattr(processstep_metadata_update.subprocess, "run", fake_run)
+
+    with pytest.raises(subprocess.CalledProcessError, match="returned non-zero exit status 2"):
+        processstep_metadata_update.run(
+            mini_dataset.repetition_dir,
+            mini_dataset.defaults,
+            logbook_reader=None,
+            logger=mini_dataset.defaults.logger,
+        )

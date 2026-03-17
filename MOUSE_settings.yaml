@@ -13,3 +13,6 @@ translator_template_dir: "/Users/bpauw/Documents/BAM/Measurements/newMouseTest/M
 
 # We use a separate logbook for processing. Make sure to set the "use" flag to True for all entries that should be searched
 logbook_file: "/Users/bpauw/Documents/BAM/Measurements/newMouseTest/Measurements/SAXS002/logbooks/Logbook_MOUSE_Dataprocessing.xlsx"
+
+# Emit lightweight timing logs for each processing step and batch.
+profile_steps: true

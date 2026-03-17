@@ -23,11 +23,14 @@ The following migration steps are now implemented in this repository:
 - `src/processstep_metadata_update.py` now also writes `/entry1/sample/sampleowner` as a compatibility alias from the CLI-written `/entry1/sample/owner`.
 - `src/directory_processor.py` now emits lightweight per-step timing logs when profiling is enabled.
 - `pytest.ini`, `requirements-dev.txt`, and a first `tests/` suite have been added.
-- The current local test suite passes: 4 tests.
+- `pyproject.toml` now provides package metadata, dependencies, and a `mouse-directory-processor` console entry point.
+- `requirements-dev.txt` now installs the project in editable mode through `-e .[dev]`.
+- `MOUSE_settings.yaml` now documents the `profile_steps` toggle.
+- The current local test suite passes: 7 tests.
 
 What is still transitional:
 
-- No `pyproject.toml` or package metadata has been added yet.
+- Fresh-environment validation with full dependency resolution has not been exercised from scratch in this repository yet.
 
 ## Current State Observations
 
@@ -35,7 +38,7 @@ What is still transitional:
 - Most process steps only accept the reader in their signature, and none of the active runtime steps currently dereference it directly.
 - `src/processstep_metadata_update.py` is now a thin CLI wrapper around `mouse_logbook`.
 - The entry points still default to `python`, but the batch script now allows overriding the interpreter through `PYTHON_BIN`.
-- The repository now has `pytest` scaffolding and a small integration-oriented test suite, but still has no `pyproject.toml`.
+- The repository now has `pytest` scaffolding, an editable-install path via `pyproject.toml`, updated README usage examples, and a small integration-oriented test suite.
 
 ## Findings About `mouse_logbook`
 
@@ -70,12 +73,15 @@ The repository has already completed the dependency migration. The remaining wor
 
 Partially complete.
 
-- `requirements-dev.txt` and `pytest.ini` exist.
+- `pyproject.toml`, `requirements-dev.txt`, and `pytest.ini` exist.
+- Editable installation works with `./.venv/bin/python -m pip install -e '.[dev]' --no-deps`.
+- `MOUSE_settings.yaml` now documents `profile_steps`.
+- `README.md` now documents editable installation, the `mouse-directory-processor` entry point, and `PYTHON_BIN` for the shell wrapper.
 - `pytest` tests now cover:
   - metadata updates via the CLI writer
   - `DirectoryProcessor` startup without eager reader construction
   - reader initialization against a small Excel fixture
-- Packaging metadata and a cleaner developer install path still need to be added.
+- The remaining packaging gap is full fresh-environment validation including dependency resolution from scratch.
 
 ## Phase 2: Expand Test Coverage
 
@@ -101,9 +107,9 @@ The first `pytest` scaffolding is in place. The next step is to cover the main f
 
 ### Status
 
-- Started.
-- Current tests cover the happy path for metadata writing, lazy reader construction, and reader initialization on a small fixture.
-- The biggest gaps are failure paths, more orchestration coverage, and step-specific smoke tests.
+- In progress.
+- Current tests cover the happy path for metadata writing, metadata CLI failure propagation, lazy reader construction, profiling enable/disable behavior, parallel-error propagation, and reader initialization on a small fixture.
+- The biggest gaps are step-specific smoke tests and broader orchestration coverage.
 
 ## Phase 3: Runtime Robustness Cleanup
 
@@ -152,9 +158,9 @@ The migration can be considered complete when all of the following are true:
 
 The highest-value next implementation step is:
 
-1. add a `pyproject.toml` and split runtime vs development dependencies
-2. expand `pytest` coverage to failure paths, parallel execution, and selected processing steps
-3. tighten CLI/runtime documentation around `.venv` and `PYTHON_BIN`
-4. collect and review real profiling output from representative batches
+1. expand `pytest` coverage to selected real processing steps with small-file smoke tests
+2. collect and review real profiling output from representative batches
+3. replace runtime `assert` statements with explicit validation errors in the orchestration layer
+4. validate a clean install path with full dependency resolution in a fresh environment
 
 The dependency swap is complete in code. The remaining work is now testing, packaging, and cleanup.

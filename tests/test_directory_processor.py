@@ -3,6 +3,8 @@ from __future__ import annotations
 import logging
 from types import SimpleNamespace
 
+import pytest
+
 import directory_processor
 from YMD_class import YMD
 from directory_processor import DirectoryProcessor
@@ -24,7 +26,11 @@ def test_directory_processor_runs_non_reader_step_without_building_reader(mini_d
         run=lambda dir_path, defaults, logbook_reader, logger: calls.append("run"),
     )
 
-    monkeypatch.setattr(directory_processor.importlib, "import_module", lambda name: fake_module)
+    monkeypatch.setattr(
+        directory_processor,
+        "importlib",
+        SimpleNamespace(import_module=lambda name: fake_module),
+    )
     monkeypatch.setattr(
         directory_processor,
         "build_logbook_reader",
@@ -43,3 +49,61 @@ def test_directory_processor_runs_non_reader_step_without_building_reader(mini_d
     assert calls == ["run"]
     assert processor.logbook_reader is None
     assert "PROFILE step=fake_step" in caplog.text
+
+
+def test_directory_processor_omits_profile_logs_when_disabled(mini_dataset, monkeypatch, caplog):
+    mini_dataset.defaults.profile_steps = False
+    processor = DirectoryProcessor(defaults=mini_dataset.defaults, steps=["fake_step"])
+
+    fake_module = SimpleNamespace(
+        requires_logbook_reader=False,
+        can_run=lambda dir_path, defaults, logbook_reader, logger: True,
+        run=lambda dir_path, defaults, logbook_reader, logger: None,
+    )
+
+    monkeypatch.setattr(
+        directory_processor,
+        "importlib",
+        SimpleNamespace(import_module=lambda name: fake_module),
+    )
+
+    caplog.set_level(logging.INFO, logger="DefaultsCarrier")
+    processor._run_processing_step(
+        "fake_step",
+        mini_dataset.repetition_dir,
+        YMD(mini_dataset.ymd),
+        mini_dataset.batch_num,
+        mini_dataset.repetition,
+    )
+
+    assert "PROFILE step=fake_step" not in caplog.text
+
+
+def test_directory_processor_propagates_parallel_step_errors(mini_dataset, monkeypatch):
+    processor = DirectoryProcessor(defaults=mini_dataset.defaults, steps=["fake_step"])
+    second_dir = mini_dataset.repetition_dir.parent / f"{mini_dataset.ymd}_{mini_dataset.batch_num}_1"
+    second_dir.mkdir(parents=True, exist_ok=True)
+
+    fake_module = SimpleNamespace(
+        requires_logbook_reader=False,
+        can_process_repetitions_in_parallel=True,
+        can_run=lambda dir_path, defaults, logbook_reader, logger: True,
+        run=lambda dir_path, defaults, logbook_reader, logger: (
+            (_ for _ in ()).throw(RuntimeError("parallel step failed"))
+            if dir_path == second_dir else None
+        ),
+    )
+
+    monkeypatch.setattr(
+        directory_processor,
+        "importlib",
+        SimpleNamespace(import_module=lambda name: fake_module),
+    )
+    monkeypatch.setattr(
+        DirectoryProcessor,
+        "_get_all_repetitions_directories",
+        lambda self, ymd, batch: [mini_dataset.repetition_dir, second_dir],
+    )
+
+    with pytest.raises(RuntimeError, match="parallel step failed"):
+        processor.process_batch(mini_dataset.ymd, mini_dataset.batch_num, parallel=True)
