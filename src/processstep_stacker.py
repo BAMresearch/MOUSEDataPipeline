@@ -5,7 +5,7 @@ from typing import Dict, List
 import h5py
 from YMD_class import YMD, extract_metadata_from_path
 from defaults_carrier import DefaultsCarrier
-from logbook2mouse.logbook_reader import Logbook2MouseReader
+from logbook_support import LogbookReaderLike
 import logging
 
 from utilities import get_processed_files, sort_processed_files_by_instrument_configuration
@@ -39,7 +39,7 @@ def processing_needed_for_config(dir_path: Path, ymd: YMD, batch: str, config: s
     return False
 
 
-def can_run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2MouseReader, logger: logging.Logger) -> bool:
+def can_run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: LogbookReaderLike | None, logger: logging.Logger) -> bool:
     """
     Checks if the translator step could run. Here, we need to do four things: 
     0) check if there is a stacked file already, if not, we need to run this step.
@@ -61,7 +61,7 @@ def can_run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2M
     return False
 
 
-def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2MouseReader, logger: logging.Logger):
+def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: LogbookReaderLike | None, logger: logging.Logger):
     """
     Executes the translator processing step.
     """

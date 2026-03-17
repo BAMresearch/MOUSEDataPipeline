@@ -3,10 +3,10 @@ import logging
 from pathlib import Path
 from typing import Optional, Tuple, List
 import attrs
-import concurrent
+import concurrent.futures
 from defaults_carrier import DefaultsCarrier, load_config_from_yaml
+from logbook_support import LogbookReaderLike, build_logbook_reader
 from YMD_class import YMD, extract_metadata_from_path
-from logbook2mouse.logbook_reader import Logbook2MouseReader  # type: ignore
 
 
 @attrs.define
@@ -15,7 +15,7 @@ class DirectoryProcessor:
     A class to manage and execute directory processing tasks using modular steps.
     """
     defaults: DefaultsCarrier = attrs.field(validator=attrs.validators.instance_of(DefaultsCarrier))
-    logbook_reader: Logbook2MouseReader = attrs.field(init=False, default=None)
+    logbook_reader: LogbookReaderLike | None = attrs.field(init=False, default=None)
     logger: logging.Logger = attrs.field(init=False, default=None)
     steps: List[str] = attrs.field(factory=list)  # List of processing step module names
 
@@ -27,10 +27,15 @@ class DirectoryProcessor:
         # set logger level by default to warning:
         self.logger.setLevel(logging.WARNING)
         self.logger.debug(f"Initializing {self.__class__.__name__}...")
-        self.logbook_reader = Logbook2MouseReader(
-            self.defaults.logbook_file,
-            project_base_path=self.defaults.projects_dir
-        )
+
+    def _get_logbook_reader(self) -> LogbookReaderLike:
+        if self.logbook_reader is None:
+            self.logbook_reader = build_logbook_reader(
+                self.defaults.logbook_file,
+                self.defaults.projects_dir,
+                logger=self.logger,
+            )
+        return self.logbook_reader
 
     def process_directory(
         self,
@@ -85,7 +90,8 @@ class DirectoryProcessor:
                 executor.submit(self._run_processing_step, step_name, directory, ymd, batch, None)
                 for directory in directories
             ]
-            concurrent.futures.wait(futures)
+            for future in concurrent.futures.as_completed(futures):
+                future.result()
 
     def _get_all_repetitions_directories(self, ymd: YMD, batch: int) -> List[Path]:
         """
@@ -129,10 +135,11 @@ class DirectoryProcessor:
         """
         try:
             module = importlib.import_module(step_name)
+            logbook_reader = self._get_logbook_reader() if getattr(module, "requires_logbook_reader", False) else None
             if hasattr(module, "can_run") and hasattr(module, "run"):
-                if module.can_run(dir_path, self.defaults, self.logbook_reader, self.logger):
+                if module.can_run(dir_path, self.defaults, logbook_reader, self.logger):
                     self.logger.info(f"Running step: {step_name}")
-                    module.run(dir_path, self.defaults, self.logbook_reader, self.logger)
+                    module.run(dir_path, self.defaults, logbook_reader, self.logger)
                 else:
                     self.logger.info(f"Step skipped: {step_name}")
             else:

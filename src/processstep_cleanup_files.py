@@ -2,7 +2,7 @@ from pathlib import Path
 import subprocess
 from YMD_class import extract_metadata_from_path
 from defaults_carrier import DefaultsCarrier
-from logbook2mouse.logbook_reader import Logbook2MouseReader
+from logbook_support import LogbookReaderLike
 import logging
 
 doc = """
@@ -12,13 +12,13 @@ This processing step cleans up the temporary and intermediate files created duri
 # Flag indicating whether this process step can be executed in parallel on multiple repetitions
 can_process_repetitions_in_parallel = True
 
-def can_run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2MouseReader, logger: logging.Logger) -> bool:
+def can_run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: LogbookReaderLike | None, logger: logging.Logger) -> bool:
     """
     Checks if the translator step should run.
     """
     return True # can always run this step
 
-def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2MouseReader, logger: logging.Logger):
+def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: LogbookReaderLike | None, logger: logging.Logger):
     """
     Executes the translator processing step.
     """

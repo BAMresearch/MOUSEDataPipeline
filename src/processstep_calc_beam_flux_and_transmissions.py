@@ -3,7 +3,7 @@ import subprocess
 from YMD_class import extract_metadata_from_path
 # from checkers import len_files_in_path, processing_possible
 from defaults_carrier import DefaultsCarrier
-from logbook2mouse.logbook_reader import Logbook2MouseReader  # type: ignore
+from logbook_support import LogbookReaderLike
 import logging
 from utilities import get_float_from_h5, prepare_eiger_image, label_main_feature
 from skimage import measure
@@ -145,7 +145,7 @@ def dynamic_beam_analysis(imageData: np.ndarray, coverage: float = 0.997, beam_c
     return weighted_center_of_mass, ITotal_region, ITotal_overall, beam_coverage_mask, sigma_minor, sigma_major, theta, achieved_coverage
 
 
-def can_run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2MouseReader, logger: logging.Logger) -> bool:
+def can_run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: LogbookReaderLike | None, logger: logging.Logger) -> bool:
     """
     Checks if the beam flux and transmissions determination can run. We need the translated file.
     """
@@ -158,7 +158,7 @@ def can_run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2M
     return True
 
 
-def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2MouseReader, logger: logging.Logger):
+def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: LogbookReaderLike | None, logger: logging.Logger):
     """
     After the beam center and beam masks have been determined, we can now calculate the beam flux and transmissions.
     We will calculate two transmission factors: the image transmission, which is the ratio of total intensity in the

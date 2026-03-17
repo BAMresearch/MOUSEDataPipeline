@@ -5,7 +5,7 @@ import h5py
 import numpy as np
 from YMD_class import extract_metadata_from_path
 from defaults_carrier import DefaultsCarrier
-from logbook2mouse.logbook_reader import Logbook2MouseReader
+from logbook_support import LogbookReaderLike
 import logging
 from HDF5Translator.translator_elements import TranslationElement
 from HDF5Translator.translator import process_translation_element
@@ -21,7 +21,7 @@ This correction factor approximates the correction for adding the scattering to 
 can_process_repetitions_in_parallel = False
 
 
-def can_run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2MouseReader, logger: logging.Logger) -> bool:
+def can_run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: LogbookReaderLike | None, logger: logging.Logger) -> bool:
     """
     Checks if this step can run. We only want to run this once per batch, so we check if we are in the lowest repetition
     """
@@ -34,7 +34,7 @@ def can_run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2M
     return True
 
 
-def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2MouseReader, logger: logging.Logger):
+def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: LogbookReaderLike | None, logger: logging.Logger):
     """
     Executes the processing step.
     This step applies the transmission correction factor to the transmission factor stored in the same file.

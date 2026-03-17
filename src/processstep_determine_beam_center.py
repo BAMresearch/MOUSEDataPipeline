@@ -4,7 +4,7 @@ import subprocess
 from YMD_class import extract_metadata_from_path
 from checkers import len_files_in_path, processing_possible
 from defaults_carrier import DefaultsCarrier
-from logbook2mouse.logbook_reader import Logbook2MouseReader
+from logbook_support import LogbookReaderLike
 import logging
 from utilities import reduce_extra_image_dimensions, prepare_eiger_image, label_main_feature
 from skimage.measure import regionprops
@@ -14,10 +14,10 @@ from HDF5Translator.translator_elements import TranslationElement
 from HDF5Translator.translator import process_translation_element
 
 # Flag indicating whether this process step can be executed in parallel on multiple repetitions
-can_process_repetitions_in_parallel = True
+can_process_repetitions_in_parallel = False
 
 
-def can_run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2MouseReader, logger: logging.Logger) -> bool:
+def can_run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: LogbookReaderLike | None, logger: logging.Logger) -> bool:
     """
     Checks if the beam center determination should run. We need the translated file.
     """
@@ -30,7 +30,7 @@ def can_run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2M
     return True
 
 
-def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2MouseReader, logger: logging.Logger):
+def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: LogbookReaderLike | None, logger: logging.Logger):
     """
     Executes the beam center determination processing step.
     """
@@ -57,6 +57,7 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
             # recordingTime = h5_in[BeamDurationPath][()]
         maskedTwoDImage = prepare_eiger_image(imageData, logging.getLogger())
         # create labeled mask:
+        print(f'Looking for main feature in beam center determination for {input_file}')
         labels = label_main_feature(maskedTwoDImage, logging.getLogger())
         # step 4: calculate region properties
         properties = regionprops(labels, maskedTwoDImage)  # calculate region properties

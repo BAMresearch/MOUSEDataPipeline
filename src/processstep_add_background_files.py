@@ -4,7 +4,7 @@ from typing import Tuple, Union
 import h5py
 from YMD_class import extract_metadata_from_path
 from defaults_carrier import DefaultsCarrier
-from logbook2mouse.logbook_reader import Logbook2MouseReader  # type: ignore
+from logbook_support import LogbookReaderLike
 import logging
 
 from utilities import get_configuration
@@ -18,7 +18,7 @@ Should be run after the metadata update step.
 can_process_repetitions_in_parallel = True
 
 
-def can_run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2MouseReader, logger: logging.Logger) -> bool:
+def can_run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: LogbookReaderLike | None, logger: logging.Logger) -> bool:
     """
     Checks if the translator step should run.
     """
@@ -51,7 +51,7 @@ def get_background_identifiers(filename: Path, logger: logging.Logger) -> Tuple[
     return bgid, dbgid
 
 
-def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2MouseReader, logger: logging.Logger):
+def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: LogbookReaderLike | None, logger: logging.Logger):
     """
     Executes the translator processing step.
     """

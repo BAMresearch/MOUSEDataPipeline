@@ -1,13 +1,15 @@
 from datetime import datetime
 from pathlib import Path
+import shutil
 import subprocess
+import sys
 
 import HDF5Translator
 import h5py
 import numpy as np
 from YMD_class import YMD, extract_metadata_from_path
 from defaults_carrier import DefaultsCarrier
-from logbook2mouse.logbook_reader import Logbook2MouseReader
+from logbook_support import LogbookReaderLike, build_logbook_reader
 import logging
 from HDF5Translator.translator_elements import TranslationElement
 from HDF5Translator.translator import process_translation_element
@@ -25,7 +27,7 @@ with details from the logbook and project/sample information
 can_process_repetitions_in_parallel = False
 
 
-def can_run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2MouseReader, logger: logging.Logger) -> bool:
+def can_run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: LogbookReaderLike | None, logger: logging.Logger) -> bool:
     """
     Checks if the translator step could run.
     """
@@ -38,7 +40,7 @@ def can_run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2M
     return True
 
 
-def findentry(ymd:YMD, batch:int, logbook_reader: Logbook2MouseReader):
+def findentry(ymd:YMD, batch:int, logbook_reader: LogbookReaderLike):
     # print(f'searching for {ymd.YMD} and {batch}, type {type(ymd.YMD)} and {type(batch)}')
     batch = int(batch)
     for entry in logbook_reader.entries:
@@ -87,13 +89,61 @@ def get_energy_from_h5(filename: Path, logger: logging.Logger) -> float:
     return energy_keV
 
 
-def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2MouseReader, logger: logging.Logger):
+def _resolve_mouse_logbook_cli() -> Path:
+    candidates = [
+        shutil.which("mouse-logbook"),
+        str(Path(sys.executable).resolve().with_name("mouse-logbook")),
+        str(Path(__file__).resolve().parents[1] / ".venv" / "bin" / "mouse-logbook"),
+    ]
+    for candidate in candidates:
+        if not candidate:
+            continue
+        candidate_path = Path(candidate)
+        if candidate_path.is_file():
+            return candidate_path
+    raise FileNotFoundError("Could not locate a mouse-logbook executable.")
+
+
+def _run_mouse_logbook_cli(input_file: Path, ymd: YMD, batch: int, defaults: DefaultsCarrier, logger: logging.Logger) -> None:
+    cli = _resolve_mouse_logbook_cli()
+    command = [
+        str(cli),
+        "write-nexus-metadata",
+        str(defaults.logbook_file),
+        str(defaults.projects_dir),
+        str(input_file),
+        "--ymd",
+        ymd.YMD,
+        "--batch-num",
+        str(batch),
+    ]
+    logger.info("Running metadata update via mouse_logbook CLI: %s", " ".join(command))
+    result = subprocess.run(command, check=True, capture_output=True, text=True)
+    if result.stdout.strip():
+        logger.info(result.stdout.strip())
+    if result.stderr.strip():
+        logger.info(result.stderr.strip())
+
+
+def run_legacy_metadata_update(
+    dir_path: Path,
+    defaults: DefaultsCarrier,
+    logbook_reader: LogbookReaderLike | None,
+    logger: logging.Logger,
+):
     """
     Updates some metadata fields in the process with a new version of the metadata from the logbook and project/sample information.
     """
     ymd, batch, repetition = extract_metadata_from_path(dir_path)
     input_file = dir_path / f'MOUSE_{ymd}_{batch}_{repetition}.nxs'
     # get the logbook entry for this measurement
+    if logbook_reader is None:
+        logbook_reader = build_logbook_reader(
+            defaults.logbook_file,
+            defaults.projects_dir,
+            logger=logger,
+        )
+
     entry = findentry(ymd, batch, logbook_reader)
     energy = get_energy_from_h5(input_file, logger)
     # print(f'* * * * * * * * {energy=} * * * * * * * * ')
@@ -325,3 +375,32 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
         # Print the standard output and standard error
         logger.info("Subprocess failed with stderr:")
         logger.info(e)
+
+
+def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: LogbookReaderLike | None, logger: logging.Logger):
+    """
+    Prefer the new mouse_logbook CLI writer. Fall back to the legacy in-process writer
+    until all environments are upgraded and validated.
+    """
+    ymd, batch, repetition = extract_metadata_from_path(dir_path)
+    input_file = dir_path / f'MOUSE_{ymd}_{batch}_{repetition}.nxs'
+
+    try:
+        _run_mouse_logbook_cli(
+            input_file=input_file,
+            ymd=ymd,
+            batch=batch,
+            defaults=defaults,
+            logger=logger,
+        )
+        logger.info(f"Completed metadata update via mouse_logbook CLI for {input_file}")
+        return
+    except (FileNotFoundError, subprocess.CalledProcessError) as exc:
+        logger.warning(
+            "mouse_logbook CLI metadata update unavailable or failed for %s; "
+            "falling back to legacy metadata updater. Error: %s",
+            input_file,
+            exc,
+        )
+
+    run_legacy_metadata_update(dir_path, defaults, logbook_reader, logger)

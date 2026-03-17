@@ -4,7 +4,7 @@ import subprocess
 import h5py
 from YMD_class import YMD, extract_metadata_from_path
 from defaults_carrier import DefaultsCarrier
-from logbook2mouse.logbook_reader import Logbook2MouseReader
+from logbook_support import LogbookReaderLike
 import logging
 from HDF5Translator.translator_elements import TranslationElement
 from HDF5Translator.translator import process_translation_element
@@ -19,7 +19,7 @@ This processing step finds the correct mask file for this measurement and adds i
 can_process_repetitions_in_parallel = True
 
 
-def can_run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2MouseReader, logger: logging.Logger) -> bool:
+def can_run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: LogbookReaderLike | None, logger: logging.Logger) -> bool:
     """
     Checks if the translator step should run.
     """
@@ -81,7 +81,7 @@ def find_appropriate_mask(defaults: DefaultsCarrier, measurement_ymd: YMD, confi
     return best_mask
 
 
-def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2MouseReader, logger: logging.Logger):
+def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: LogbookReaderLike | None, logger: logging.Logger):
     """
     Executes the translator processing step.
     """

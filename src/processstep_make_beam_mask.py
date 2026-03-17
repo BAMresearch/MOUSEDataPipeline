@@ -4,7 +4,7 @@ import subprocess
 from YMD_class import extract_metadata_from_path
 from checkers import len_files_in_path, processing_possible
 from defaults_carrier import DefaultsCarrier
-from logbook2mouse.logbook_reader import Logbook2MouseReader
+from logbook_support import LogbookReaderLike
 import logging
 from utilities import reduce_extra_image_dimensions, prepare_eiger_image, label_main_feature
 from skimage.measure import regionprops
@@ -39,7 +39,7 @@ def generate_mask(image_shape, center, radius, logger: logging.Logger) -> np.nda
 can_process_repetitions_in_parallel = True
 
 
-def can_run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2MouseReader, logger: logging.Logger) -> bool:
+def can_run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: LogbookReaderLike | None, logger: logging.Logger) -> bool:
     """
     Checks if the beam mask determination can run. We need the translated file.
     """
@@ -52,7 +52,7 @@ def can_run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2M
     return True
 
 
-def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2MouseReader, logger: logging.Logger):
+def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: LogbookReaderLike | None, logger: logging.Logger):
     """
     Executes the beam mask determination processing step. This version determines the appropriate beam mask
     based on the distance between sample and detector, so that the solid angle coverage is similar. 

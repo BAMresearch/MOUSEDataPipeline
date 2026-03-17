@@ -3,5 +3,7 @@ h5py
 hdf5plugin
 numpy
 scikit-image
+pint
 git+https://github.com/BAMresearch/HDF5Translator.git
+git+https://github.com/BAMresearch/mouse_logbook.git
 git+https://github.com/BAMresearch/logbook2mouse.git
