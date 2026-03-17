@@ -108,36 +108,69 @@ The configuration file also supports:
 - `logging_level: INFO` to make the profiling output visible during runs
 - `log_per_datafile: true` to write a `MOUSE_<ymd>_<batch>_<repetition>.processing.log` file next to each repetition output
 
-# usage example:
+# CLI overview
+
+The main entry point is:
+
+```zsh
+./.venv/bin/mouse-directory-processor
+```
+
+You can inspect the available step modules and built-in presets with:
+
+```zsh
+./.venv/bin/mouse-directory-processor --list-steps
+./.venv/bin/mouse-directory-processor --list-step-presets
+```
+
+The current built-in presets are:
+
+- `preprocess`: the standard non-stacking pipeline used by `directory_processor_multibatch_nostack.sh`
+- `stackonly`: the batch stacking step used by `directory_processor_multibatch_stackonly.sh`
+
+# usage example
 
 To process directories using specific configurations and steps, execute the following commands in your terminal:
 
 ```zsh
-./.venv/bin/mouse-directory-processor --config MOUSE_settings.yaml --single_dir ~/Documents/BAM/Measurements/newMouseTest/Measurements/SAXS002/data/2025/20250101/20250101_21_22  --steps processstep_translator_step_1 processstep_translator_step_2 processstep_beamanalysis
+./.venv/bin/mouse-directory-processor --config MOUSE_settings.yaml \
+  --single_dir ~/Documents/BAM/Measurements/newMouseTest/Measurements/SAXS002/data/2025/20250101/20250101_21_22 \
+  --step-preset preprocess
 ```
 
 Alternatively, specify measurement details directly:
 
 ```zsh
-./.venv/bin/mouse-directory-processor --config MOUSE_settings.yaml --ymd 20250101 --batch 21 --repetition 22 --steps processstep_translator_step_1 processstep_translator_step_2 processstep_beamanalysis
+./.venv/bin/mouse-directory-processor --config MOUSE_settings.yaml \
+  --ymd 20250101 --batch 21 --repetition 22 \
+  --step-preset preprocess
 ```
 
-If you want to do all currently ready steps for all repetitions in a batch, run the following:
+If you want to process a full batch with the standard preprocessing preset, run:
+
 ```zsh
 ./.venv/bin/mouse-directory-processor --config MOUSE_settings.yaml \
---ymd 20250101 --batch 21 --parallel --steps \
-processstep_translator_step_1 \
-processstep_translator_step_2 \
-processstep_beamanalysis \
-processstep_cleanup_files \
-processstep_add_mask_file \
-processstep_metadata_update \
-processstep_thickness_from_absorption \
-processstep_add_background_files \
-processstep_stacker
+  --ymd 20250101 --batch 21 --parallel \
+  --step-preset preprocess
 ```
 
-The shell wrappers in `src/` still work. If you want them to use a specific interpreter, set `PYTHON_BIN`, for example:
+If you want to run only the stacking step for a batch, use:
+
+```zsh
+./.venv/bin/mouse-directory-processor --config MOUSE_settings.yaml \
+  --ymd 20250101 --batch 21 --parallel \
+  --step-preset stackonly
+```
+
+If you need a custom subset of steps, use `--steps` instead of `--step-preset`:
+
+```zsh
+./.venv/bin/mouse-directory-processor --config MOUSE_settings.yaml \
+  --single_dir ~/Documents/BAM/Measurements/newMouseTest/Measurements/SAXS002/data/2025/20250101/20250101_21_22 \
+  --steps processstep_translator_step_1 processstep_translator_step_2 processstep_metadata_update
+```
+
+The shell wrappers in `src/` still work and now delegate to these presets. If you want them to use a specific interpreter, set `PYTHON_BIN`, for example:
 
 ```zsh
 PYTHON_BIN=./.venv/bin/python ./src/directory_processor_multibatch_nostack.sh 20260311 1 1

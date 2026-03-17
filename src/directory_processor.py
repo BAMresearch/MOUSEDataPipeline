@@ -13,6 +13,44 @@ from defaults_carrier import DefaultsCarrier, load_config_from_yaml
 from logbook_support import LogbookReaderLike, build_logbook_reader
 from YMD_class import YMD, extract_metadata_from_path
 
+STEP_PRESETS: dict[str, list[str]] = {
+    "preprocess": [
+        "processstep_translator_step_1",
+        "processstep_translator_step_2",
+        "processstep_average_to_counts",
+        "processstep_cleanup_files",
+        "processstep_add_mask_file",
+        "processstep_metadata_update",
+        "processstep_determine_beam_center",
+        "processstep_make_beam_mask",
+        "processstep_calc_beam_flux_and_transmissions",
+        "processstep_calc_beam_shape_info",
+        "processstep_add_background_files",
+        "processstep_transmission_correction_factor_propagator",
+        "processstep_apply_transmission_correction_factor",
+        "processstep_thickness_from_absorption",
+        "processstep_transmission_thickness_flux_table",
+    ],
+    "stackonly": [
+        "processstep_stacker",
+    ],
+}
+
+
+def discover_process_steps() -> list[str]:
+    processstep_dir = Path(__file__).resolve().parent
+    return sorted(path.stem for path in processstep_dir.glob("processstep_*.py") if path.stem != "processstep_template")
+
+
+def resolve_requested_steps(steps: list[str] | None, step_preset: str | None) -> list[str]:
+    if step_preset and steps:
+        raise ValueError("Use either --steps or --step-preset, not both.")
+    if step_preset:
+        return STEP_PRESETS[step_preset]
+    if steps:
+        return steps
+    raise ValueError("Specify processing steps with --steps or choose a --step-preset.")
+
 
 @attrs.define
 class DirectoryProcessor:
@@ -244,27 +282,75 @@ class DirectoryProcessor:
             raise
 
 
-def main():
+def build_arg_parser():
     """
-    Main entry point for the processing script.
+    Build the command line parser for the directory processor.
     """
     import argparse
 
-    parser = argparse.ArgumentParser(description="Process directories using DirectoryProcessor.")
+    parser = argparse.ArgumentParser(
+        description="Process MOUSE repetition directories or full batches using modular processing steps.",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+        epilog=(
+            "Examples:\n"
+            "  mouse-directory-processor --single_dir /path/to/20260311_1_0 --step-preset preprocess\n"
+            "  mouse-directory-processor --ymd 20260311 --batch 1 --parallel --step-preset preprocess\n"
+            "  mouse-directory-processor --list-steps\n"
+            "  mouse-directory-processor --list-step-presets"
+        ),
+    )
     parser.add_argument(
-        "--config", type=str, required=True, help="Path to the configuration yaml file (contains paths)."
+        "--config",
+        type=str,
+        default="MOUSE_settings.yaml",
+        help="Path to the configuration yaml file (contains paths).",
     )
     parser.add_argument("--single_dir", type=str, help="Path to a single repetition directory to process.")
     parser.add_argument("--ymd", type=str, help="YMD string (if not using single_dir).")
     parser.add_argument("--batch", type=int, help="Batch number (if not using single_dir).")
     parser.add_argument("--repetition", type=int, help="Repetition number (if not using single_dir).")
-    parser.add_argument("--steps", type=str, nargs="+", help="List of processing step module names.", required=True)
+    parser.add_argument("--steps", type=str, nargs="+", help="Explicit list of processing step module names.")
+    parser.add_argument(
+        "--step-preset",
+        choices=sorted(STEP_PRESETS),
+        help="Named processing-step preset for common workflows.",
+    )
+    parser.add_argument("--list-steps", action="store_true", help="List discovered processstep modules and exit.")
+    parser.add_argument(
+        "--list-step-presets",
+        action="store_true",
+        help="List built-in step presets and exit.",
+    )
     parser.add_argument("--parallel", action="store_true", help="Enable parallel processing of repetitions.")
+    return parser
 
-    args = parser.parse_args()
+
+def main(argv: list[str] | None = None):
+    """
+    Main entry point for the processing script.
+    """
+    parser = build_arg_parser()
+    args = parser.parse_args(argv)
+
+    if args.list_steps:
+        for step_name in discover_process_steps():
+            print(step_name)
+        return
+
+    if args.list_step_presets:
+        for preset_name, steps in STEP_PRESETS.items():
+            print(f"{preset_name}:")
+            for step_name in steps:
+                print(f"  {step_name}")
+        return
+
+    try:
+        requested_steps = resolve_requested_steps(args.steps, args.step_preset)
+    except ValueError as exc:
+        parser.error(str(exc))
 
     defaults = DefaultsCarrier(**load_config_from_yaml(args.config))
-    processor = DirectoryProcessor(defaults=defaults, steps=args.steps)
+    processor = DirectoryProcessor(defaults=defaults, steps=requested_steps)
 
     if args.single_dir is not None or args.repetition is not None:
         processor.process_directory(
@@ -273,10 +359,14 @@ def main():
             batch=args.batch,
             repetition=args.repetition,
         )
-    else:
-        if args.ymd is None or args.batch is None:
-            parser.error("Processing all repetitions requires YMD and batch.")
-        processor.process_batch(ymd=args.ymd, batch=args.batch, parallel=args.parallel)
+        return
+
+    if args.ymd is None or args.batch is None:
+        parser.error("Batch processing requires --ymd and --batch.")
+    if args.repetition is not None:
+        parser.error("--repetition only applies to single-directory processing.")
+
+    processor.process_batch(ymd=args.ymd, batch=args.batch, parallel=args.parallel)
 
 
 if __name__ == "__main__":

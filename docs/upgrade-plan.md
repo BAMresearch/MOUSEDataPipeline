@@ -23,11 +23,13 @@ The following migration steps are now implemented in this repository:
 - `src/processstep_translator_step_2.py` continues to shell out to `python3 -m HDF5Translator`.
 - `src/directory_processor.py` now emits lightweight per-step timing logs when profiling is enabled.
 - `src/directory_processor.py` now also creates per-repetition log files alongside generated `MOUSE_*.nxs` outputs when `log_per_datafile` is enabled.
+- `src/directory_processor.py` now exposes a clearer CLI with built-in step presets and discovery flags for steps and presets.
 - `pytest.ini`, `requirements-dev.txt`, and a first `tests/` suite have been added.
 - `pyproject.toml` now provides package metadata, dependencies, and a `mouse-directory-processor` console entry point.
 - `requirements-dev.txt` now installs the project in editable mode through `-e .[dev]`.
 - `MOUSE_settings.yaml` now documents the `profile_steps` toggle.
 - `MOUSE_settings.yaml` and `README.md` now document `log_per_datafile`.
+- `README.md` now documents the preset-based CLI workflow and the discovery commands for steps and presets.
 - `tests/` now also covers realistic Excel fixtures from `mouse_logbook/tests/data`.
 - `DirectoryProcessor` and `YMD_class` now use explicit exceptions for core path/argument validation instead of runtime `assert` statements.
 - The `repetition=0` orchestration path now works correctly instead of being rejected by truthiness checks.
@@ -40,7 +42,7 @@ The following migration steps are now implemented in this repository:
 - `pyproject.toml` now exposes the linting tools both as a `pip` extra and as a `uv` dependency group.
 - `periodictable` and `xraydb` are now declared directly as runtime dependencies because the `mouse_logbook` metadata writer requires them during chemistry and X-ray validation.
 - The removed obsolete modules are no longer referenced from `pyproject.toml`.
-- The current local test suite passes: 31 tests.
+- The current local test suite passes: 35 tests.
 
 What is still transitional:
 
@@ -113,6 +115,7 @@ Partially complete.
   - quiet execution for stacker, thickness, and beam-center steps without stray stdout output
   - per-repetition log-file creation and opt-out behavior in `DirectoryProcessor`
   - explicit logger-path usage in the standalone stacker script
+  - CLI step-presets, step discovery, and preset discovery
 - The remaining packaging gap is full fresh-environment validation including dependency resolution from scratch.
 
 ### Linting Status
@@ -204,9 +207,9 @@ The migration can be considered complete when all of the following are true:
 The highest-value next implementation step is:
 
 1. expand `pytest` coverage to selected real processing steps with small-file smoke tests
-2. improve the command-line interface and README so the modern entry points, logging behavior, and common workflows are clearer
-3. keep using `pre-commit` on touched files and gradually widen `ruff` coverage once the touched-file workflow stays stable
-4. collect and review real profiling output from representative batches
-5. validate a clean install path with full dependency resolution in a fresh environment
+2. keep using `pre-commit` on touched files and gradually widen `ruff` coverage once the touched-file workflow stays stable
+3. collect and review real profiling output from representative batches
+4. validate a clean install path with full dependency resolution in a fresh environment
+5. consider one or two small usability improvements for the CLI output, such as a `--show-config` view or friendlier preset descriptions
 
 The dependency swap is complete in code. The remaining work is now testing, packaging, and cleanup.

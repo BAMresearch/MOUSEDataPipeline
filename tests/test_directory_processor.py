@@ -7,7 +7,7 @@ from types import SimpleNamespace
 import pytest
 
 import directory_processor
-from directory_processor import DirectoryProcessor
+from directory_processor import STEP_PRESETS, DirectoryProcessor, resolve_requested_steps
 from YMD_class import YMD, extract_metadata_from_path
 
 
@@ -205,3 +205,72 @@ def test_directory_processor_resolve_directory_raises_for_missing_path(mini_data
 def test_extract_metadata_from_path_raises_value_error_for_invalid_format():
     with pytest.raises(ValueError, match="Invalid directory format"):
         extract_metadata_from_path(Path("invalid-directory-name"))
+
+
+def test_resolve_requested_steps_accepts_preset():
+    assert resolve_requested_steps(None, "stackonly") == STEP_PRESETS["stackonly"]
+
+
+def test_resolve_requested_steps_rejects_steps_and_preset():
+    with pytest.raises(ValueError, match="either --steps or --step-preset"):
+        resolve_requested_steps(["processstep_metadata_update"], "stackonly")
+
+
+def test_main_lists_step_presets(capsys):
+    directory_processor.main(["--list-step-presets"])
+
+    captured = capsys.readouterr()
+    assert "preprocess:" in captured.out
+    assert "stackonly:" in captured.out
+
+
+def test_main_uses_step_preset_for_batch(mini_dataset, monkeypatch):
+    recorded: dict[str, object] = {}
+
+    monkeypatch.setattr(
+        directory_processor,
+        "load_config_from_yaml",
+        lambda path: {
+            "vsi_root": str(mini_dataset.defaults.vsi_root),
+            "post_translation_dir": str(mini_dataset.defaults.post_translation_dir),
+            "translator_template_dir": str(mini_dataset.defaults.translator_template_dir),
+            "saxs_dir": str(mini_dataset.defaults.saxs_dir),
+            "data_dir": str(mini_dataset.defaults.data_dir),
+            "masks_dir": str(mini_dataset.defaults.masks_dir),
+            "projects_dir": str(mini_dataset.defaults.projects_dir),
+            "logbook_file": str(mini_dataset.defaults.logbook_file),
+            "stacker_config_file": str(mini_dataset.defaults.stacker_config_file),
+            "logging_level": mini_dataset.defaults.logging_level,
+            "profile_steps": mini_dataset.defaults.profile_steps,
+            "log_per_datafile": mini_dataset.defaults.log_per_datafile,
+        },
+    )
+
+    def fake_process_batch(self, ymd, batch, parallel):
+        recorded["steps"] = self.steps
+        recorded["ymd"] = ymd
+        recorded["batch"] = batch
+        recorded["parallel"] = parallel
+
+    monkeypatch.setattr(DirectoryProcessor, "process_batch", fake_process_batch)
+
+    directory_processor.main(
+        [
+            "--config",
+            "dummy.yaml",
+            "--ymd",
+            mini_dataset.ymd,
+            "--batch",
+            str(mini_dataset.batch_num),
+            "--parallel",
+            "--step-preset",
+            "stackonly",
+        ]
+    )
+
+    assert recorded == {
+        "steps": STEP_PRESETS["stackonly"],
+        "ymd": mini_dataset.ymd,
+        "batch": mini_dataset.batch_num,
+        "parallel": True,
+    }

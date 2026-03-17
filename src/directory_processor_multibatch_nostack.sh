@@ -15,26 +15,9 @@ PYTHON_BIN="${PYTHON_BIN:-python}"
 # Iterate over the batch numbers within the specified range
 for ((batch=MIN_BATCH; batch<=MAX_BATCH; batch++)); do
     echo "Processing batch $batch for YMD $YMD"
-    
+
     "$PYTHON_BIN" src/directory_processor.py --config MOUSE_settings.yaml --ymd "$YMD" \
-    --batch "$batch" --parallel --steps \
-    processstep_translator_step_1 \
-    processstep_translator_step_2 \
-    processstep_average_to_counts \
-    processstep_cleanup_files \
-    processstep_add_mask_file \
-    processstep_metadata_update \
-    processstep_determine_beam_center \
-    processstep_make_beam_mask \
-    processstep_calc_beam_flux_and_transmissions \
-    processstep_calc_beam_shape_info \
-    processstep_add_background_files \
-    processstep_transmission_correction_factor_propagator \
-    processstep_apply_transmission_correction_factor \
-    processstep_thickness_from_absorption \
-    processstep_transmission_thickness_flux_table
-    # processstep_stacker
-    # processstep_beamanalysis \
+    --batch "$batch" --parallel --step-preset preprocess
 
     # Check if the last command was successful
     if [ $? -ne 0 ]; then
