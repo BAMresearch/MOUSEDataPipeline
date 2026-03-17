@@ -76,9 +76,7 @@ py-modules = [
 line-length = 120
 target-version = "py310"
 extend-exclude = [
-    "tester.ipynb",
-    "src/obsolete_post_translation_operation_MOUSE_beamanalysis.py",
-    "src/obsolete_post_translation_operation_MOUSE_beamcenter.py",
+    "notebooks/",
 ]
 
 [tool.ruff.lint]
