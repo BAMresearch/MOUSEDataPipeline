@@ -143,6 +143,10 @@ def label_main_feature(maskedTwoDImage: np.ndarray, logger: logging.Logger) -> n
     """
     Labels the main feature in the image using connected component analysis.
     """
+    # Preserve the old "strictly smaller than 20 px" cleanup behavior after the
+    # skimage 0.26 switch from min_size/area_threshold to max_size semantics.
+    cleanup_max_size = 19
+
     threshold_value = np.maximum(
         1,
         1 * maskedTwoDImage.mean(),  # 0.0001 * maskedTwoDImage.max()
@@ -157,9 +161,9 @@ def label_main_feature(maskedTwoDImage: np.ndarray, logger: logging.Logger) -> n
         morphology.convex_hull_image(  # we expect the beam to be convex
             morphology.remove_small_holes(  # with moly we may see small dead pixels in the beam
                 morphology.remove_small_objects(  # we don't care about isolated spikes
-                    mask, min_size=20
+                    mask, max_size=cleanup_max_size
                 ),
-                area_threshold=20,
+                max_size=cleanup_max_size,
             ),
         ),
         connectivity=1,

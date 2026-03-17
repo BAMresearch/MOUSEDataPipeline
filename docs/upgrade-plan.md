@@ -32,6 +32,7 @@ The following migration steps are now implemented in this repository:
 - `utilities.py`, `processstep_thickness_from_absorption.py`, and `processstep_make_beam_mask.py` now use explicit validation exceptions instead of runtime `assert` statements in their core guard rails.
 - `post_translation_operation_hdf5_stacker.py` and `processstep_calc_beam_flux_and_transmissions.py` now also use explicit validation exceptions instead of runtime `assert` statements in active runtime paths.
 - `processstep_determine_beam_center.py`, `processstep_thickness_from_absorption.py`, and `processstep_stacker.py` no longer write progress/debug information to stdout; they now use logger output instead.
+- Active `skimage` deprecation warnings have been addressed by updating beam-feature cleanup and weighted-centroid access to the current API.
 - `ruff`, `pre-commit`, and a repo-level `.pre-commit-config.yaml` have been added for incremental linting and formatting on touched files.
 - `pyproject.toml` now exposes the linting tools both as a `pip` extra and as a `uv` dependency group.
 - `periodictable` and `xraydb` are now declared directly as runtime dependencies because the `mouse_logbook` metadata writer requires them during chemistry and X-ray validation.
@@ -198,7 +199,7 @@ The migration can be considered complete when all of the following are true:
 The highest-value next implementation step is:
 
 1. expand `pytest` coverage to selected real processing steps with small-file smoke tests
-2. address the current `skimage` deprecation warnings in beam-feature detection and weighted-centroid access
+2. centralize logger usage so helper functions and process steps consistently use the passed step logger instead of ad hoc module/root loggers
 3. keep using `pre-commit` on touched files and gradually widen `ruff` coverage once the touched-file workflow stays stable
 4. collect and review real profiling output from representative batches
 5. validate a clean install path with full dependency resolution in a fresh environment

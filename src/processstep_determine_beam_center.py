@@ -61,7 +61,7 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: LogbookReader
         labels = label_main_feature(maskedTwoDImage, logger)
         # step 4: calculate region properties
         properties = regionprops(labels, maskedTwoDImage)  # calculate region properties
-        weighted_center_of_mass = properties[0].weighted_centroid  # center of mass (weighted)
+        weighted_center_of_mass = properties[0].centroid_weighted  # center of mass (weighted)
 
         # Write out the beam center:
         TElements = []  # we want to add multiple elements, so I make a list

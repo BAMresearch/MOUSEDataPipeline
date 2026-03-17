@@ -42,7 +42,7 @@ def dynamic_beam_analysis(
         the requested 2-D Gaussian coverage. - disclaimer: this method is mainly GPT code...
         """
         # 1) center and weighted moments
-        cy, cx = reg.weighted_centroid
+        cy, cx = reg.centroid_weighted
         mu_c = reg.weighted_moments_central
         m00 = reg.weighted_moments[0, 0]
         if m00 <= 0:
@@ -131,7 +131,7 @@ def dynamic_beam_analysis(
     properties = regionprops(beam_coverage_mask, maskedTwoDImage)  # calculate region properties
     # continue normally if beam found
     # center_of_mass = properties[0].centroid  # center of mass (unweighted by intensity)
-    weighted_center_of_mass = properties[0].weighted_centroid  # center of mass (weighted)
+    weighted_center_of_mass = properties[0].centroid_weighted  # center of mass (weighted)
     # get the intensity in the region of interest
     ITotal_region = float(properties[0].intensity_image.sum())
     ITotal_overall = float(maskedTwoDImage.sum())
