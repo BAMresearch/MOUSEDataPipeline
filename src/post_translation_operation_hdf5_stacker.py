@@ -87,17 +87,28 @@ class newNewConcat(object):
 
     def __init__(
         self,
-        outputFile: Path = None,
-        filenames: list = [],
-        stackItems: list = [],
-        calculate_average: list = [],
-        adjust_relative_path_oneup: list = [],
+        outputFile: Path | None = None,
+        filenames: list | None = None,
+        stackItems: list | None = None,
+        calculate_average: list | None = None,
+        adjust_relative_path_oneup: list | None = None,
     ):
-        assert isinstance(outputFile, Path), "output filename must be a path instance"
-        assert len(filenames) > 0, "at least one file is required for stacking."
-        # assert that the filenames to stack all exist:
+        if not isinstance(outputFile, Path):
+            raise TypeError("output filename must be a path instance")
+
+        filenames = list(filenames or [])
+        stackItems = list(stackItems or [])
+        calculate_average = list(calculate_average or [])
+        adjust_relative_path_oneup = list(adjust_relative_path_oneup or [])
+
+        if len(filenames) == 0:
+            raise ValueError("at least one file is required for stacking")
+
+        # Check that the filenames to stack all exist:
         okFilenames = filenames.copy()
         for fname in filenames:
+            if not fname.exists():
+                raise FileNotFoundError(f"filename {fname} does not exist in the list of files to stack")
             # if the file does not pass the canStack test, remove it from the list:
             if not canStack(fname):
                 okFilenames.remove(fname)
@@ -105,8 +116,9 @@ class newNewConcat(object):
                 # save the file in an error list text file:
                 with open(outputFile.with_suffix(".stacking_error_list"), "a") as f:
                     f.write(f"{fname}\n")
-            assert fname.exists(), f"filename {fname} does not exist in the list of files to stack."
-        assert len(okFilenames) > 0, "after checking, not enough valid files for stacking."
+        if len(okFilenames) == 0:
+            raise ValueError("after checking, not enough valid files for stacking")
+
         # store the filenames that passed the canStack test:
         filenames = okFilenames
         # store in the class
@@ -256,7 +268,8 @@ def main(
     """ """
     # Process input parameters:
     # Make sure we have at least two files to stack, something argparse cannot do
-    assert len(auxiliary_files) >= 1, "At least one file is required for stacking."
+    if len(auxiliary_files) < 1:
+        raise ValueError("At least one file is required for stacking.")
 
     # read the stacking section of the configuration file, which contains two sections: which datasets to stack and which to calculate the average and standard deviation over:
     with open(config, "r") as f:
@@ -265,7 +278,9 @@ def main(
         calculate_average = config.get("calculate_average", None)
         adjust_relative_path_oneup = config.get("adjust_relative_path_oneup", None)
     # at least the stack_datasets dictionary must exist:
-    assert stack_datasets is not None, "The configuration file must contain a 'stack_datasets' section."
+    if stack_datasets is None:
+        raise ValueError("The configuration file must contain a 'stack_datasets' section.")
+
     # Stack the datasets
     newNewConcat(output, auxiliary_files, stack_datasets, calculate_average, adjust_relative_path_oneup)
 

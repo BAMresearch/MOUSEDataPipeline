@@ -47,8 +47,6 @@ py-modules = [
     "defaults_carrier",
     "directory_processor",
     "logbook_support",
-    "obsolete_post_translation_operation_MOUSE_beamanalysis",
-    "obsolete_post_translation_operation_MOUSE_beamcenter",
     "post_translation_operation_hdf5_stacker",
     "processstep_add_background_files",
     "processstep_add_mask_file",

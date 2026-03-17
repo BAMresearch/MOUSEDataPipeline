@@ -55,10 +55,10 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: LogbookReader
             imageData = h5_in[BeamDatapath][()]
             # mean because count_time is the frame time minus the readout time.
             # recordingTime = h5_in[BeamDurationPath][()]
-        maskedTwoDImage = prepare_eiger_image(imageData, logging.getLogger())
+        maskedTwoDImage = prepare_eiger_image(imageData, logger)
         # create labeled mask:
-        print(f"Looking for main feature in beam center determination for {input_file}")
-        labels = label_main_feature(maskedTwoDImage, logging.getLogger())
+        logger.info(f"Looking for main feature in beam center determination for {input_file}")
+        labels = label_main_feature(maskedTwoDImage, logger)
         # step 4: calculate region properties
         properties = regionprops(labels, maskedTwoDImage)  # calculate region properties
         weighted_center_of_mass = properties[0].weighted_centroid  # center of mass (weighted)

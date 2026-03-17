@@ -119,10 +119,7 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: LogbookReader
 
         # Calculate the thickness from the absorption data
         thickness = calculate_thickness(absorption_coefficient, absorption_sample, logger)
-        logging.info(
-            f"Calculated {thickness=:0.03e} m from {absorption=:0.03e} ({absorption_sample=:0.03e} and background absorption {absorption_bg=:0.03e} from {background_file=}) and {absorption_coefficient=:0.03e} 1/m for file {input_file})"
-        )
-        print(
+        logger.info(
             f"Calculated {thickness=:0.03e} m from {absorption=:0.03e} ({absorption_sample=:0.03e} and background absorption {absorption_bg=:0.03e} from {background_file=}) and {absorption_coefficient=:0.03e} 1/m for file {input_file})"
         )
         # Now let's store all that information in the HDF5 file.

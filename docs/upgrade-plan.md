@@ -30,10 +30,13 @@ The following migration steps are now implemented in this repository:
 - `DirectoryProcessor` and `YMD_class` now use explicit exceptions for core path/argument validation instead of runtime `assert` statements.
 - The `repetition=0` orchestration path now works correctly instead of being rejected by truthiness checks.
 - `utilities.py`, `processstep_thickness_from_absorption.py`, and `processstep_make_beam_mask.py` now use explicit validation exceptions instead of runtime `assert` statements in their core guard rails.
+- `post_translation_operation_hdf5_stacker.py` and `processstep_calc_beam_flux_and_transmissions.py` now also use explicit validation exceptions instead of runtime `assert` statements in active runtime paths.
+- `processstep_determine_beam_center.py`, `processstep_thickness_from_absorption.py`, and `processstep_stacker.py` no longer write progress/debug information to stdout; they now use logger output instead.
 - `ruff`, `pre-commit`, and a repo-level `.pre-commit-config.yaml` have been added for incremental linting and formatting on touched files.
 - `pyproject.toml` now exposes the linting tools both as a `pip` extra and as a `uv` dependency group.
 - `periodictable` and `xraydb` are now declared directly as runtime dependencies because the `mouse_logbook` metadata writer requires them during chemistry and X-ray validation.
-- The current local test suite passes: 20 tests.
+- The removed obsolete modules are no longer referenced from `pyproject.toml`.
+- The current local test suite passes: 28 tests.
 
 What is still transitional:
 
@@ -100,6 +103,10 @@ Partially complete.
   - background-file metadata writing with a synthetic `.nxs` file
   - cleanup of intermediate step-1 output files
   - explicit validation failures in `processstep_thickness_from_absorption` and `processstep_make_beam_mask`
+  - stacker configuration and input validation plus a synthetic stacker smoke test
+  - explicit validation failure for a mismatched beam-coverage mask in `processstep_calc_beam_flux_and_transmissions`
+  - beam-center smoke testing with a synthetic detector image
+  - quiet execution for stacker, thickness, and beam-center steps without stray stdout output
 - The remaining packaging gap is full fresh-environment validation including dependency resolution from scratch.
 
 ### Linting Status
@@ -137,8 +144,8 @@ The first `pytest` scaffolding is in place. The next step is to cover the main f
 ### Status
 
 - In progress.
-- Current tests cover the happy path for metadata writing, metadata CLI failure propagation, lazy reader construction, profiling enable/disable behavior, parallel-error propagation, reader initialization on both synthetic and realistic Excel fixtures, metadata export using realistic Excel fixtures plus a synthetic `.nxs` file, and translator step 2 subprocess dispatch.
-- The biggest gaps are step-specific smoke tests and broader orchestration coverage.
+- Current tests cover the happy path for metadata writing, metadata CLI failure propagation, lazy reader construction, profiling enable/disable behavior, parallel-error propagation, reader initialization on both synthetic and realistic Excel fixtures, metadata export using realistic Excel fixtures plus a synthetic `.nxs` file, translator step 2 subprocess dispatch, and small-file smoke/validation paths in the stacker, cleanup, background-file, beam-center, beam-mask, beam-flux, and thickness-related steps.
+- The biggest gaps are broader orchestration coverage and smoke tests for more numerically heavy processing steps.
 
 ## Phase 3: Runtime Robustness Cleanup
 
@@ -146,9 +153,9 @@ These are maintainability improvements that should now be done against the migra
 
 ### Recommended cleanup items
 
-1. Continue replacing runtime `assert` statements with explicit exceptions and user-facing validation errors in the remaining data-processing and stacking modules.
+1. Continue replacing runtime `assert` statements with explicit exceptions and user-facing validation errors in any remaining active runtime modules.
 2. Centralize logging setup instead of relying on implicit logger reuse.
-3. Remove any remaining `print(...)` debugging from runtime paths.
+3. Remove any remaining `print(...)` debugging from active runtime paths and keep command/progress output in the logger only.
 4. Consider a small step registry instead of raw `importlib.import_module(...)` strings once the pipeline behavior is better covered by tests.
 5. Keep subprocess-based step wrappers simple and explicit unless a direct-library path clearly improves both performance and maintainability.
 6. Gradually widen the `ruff` rule set once the existing touched-file workflow is stable.
@@ -191,8 +198,8 @@ The migration can be considered complete when all of the following are true:
 The highest-value next implementation step is:
 
 1. expand `pytest` coverage to selected real processing steps with small-file smoke tests
-2. continue replacing runtime `assert` statements with explicit validation errors in the remaining utility, beam-analysis, and stacking modules
-3. start using `pre-commit` on touched files and fix the first round of `ruff` findings in the active process-step modules
+2. address the current `skimage` deprecation warnings in beam-feature detection and weighted-centroid access
+3. keep using `pre-commit` on touched files and gradually widen `ruff` coverage once the touched-file workflow stays stable
 4. collect and review real profiling output from representative batches
 5. validate a clean install path with full dependency resolution in a fresh environment
 

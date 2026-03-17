@@ -99,9 +99,8 @@ def dynamic_beam_analysis(
     maskedTwoDImage = prepare_eiger_image(imageData, logging.getLogger())
     sigma_minor, sigma_major, theta = None, None, None
     if beam_coverage_mask is not None:
-        assert beam_coverage_mask.shape == maskedTwoDImage.shape, (
-            "Provided beam_coverage_mask must have the same shape as imageData"
-        )
+        if beam_coverage_mask.shape != maskedTwoDImage.shape:
+            raise ValueError("Provided beam_coverage_mask must have the same shape as imageData")
         beam_coverage_mask = beam_coverage_mask.astype(int)
         achieved_coverage = None  # we assume the provided mask is good enough
     else:
@@ -121,7 +120,12 @@ def dynamic_beam_analysis(
         beam_coverage_mask = (md2 <= k * k) & (labels > 0)
         kept_intensity = float(maskedTwoDImage[beam_coverage_mask].sum())
         achieved_coverage = kept_intensity / properties[0].intensity_image.sum()
-        print(f"Refined k={k:.3f} to achieve coverage {achieved_coverage:.4f} ({coverage_target=})")
+        logging.getLogger(__name__).debug(
+            "Refined k=%.3f to achieve coverage %.4f (coverage_target=%.4f)",
+            k,
+            achieved_coverage,
+            coverage_target,
+        )
         beam_coverage_mask = beam_coverage_mask.astype(int)
 
     properties = regionprops(beam_coverage_mask, maskedTwoDImage)  # calculate region properties

@@ -99,8 +99,8 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: LogbookReader
                 "-a",
                 *files_as_str,  # <-- processed files go here
             ]
-            print(" ".join(cmd))
             logger.info(f"Starting stacker step for {parent_path}")
+            logger.debug("Running stacker command: %s", " ".join(cmd))
             result = subprocess.run(cmd, check=True, capture_output=True, text=True)
             logger.debug(result.stdout)
         logger.info(f"Completed stacker step for {parent_path}")
