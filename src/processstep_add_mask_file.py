@@ -1,15 +1,15 @@
+import logging
+from datetime import datetime
 from pathlib import Path
-import subprocess
 
 import h5py
-from YMD_class import YMD, extract_metadata_from_path
+from HDF5Translator.translator import process_translation_element
+from HDF5Translator.translator_elements import TranslationElement
+
 from defaults_carrier import DefaultsCarrier
 from logbook_support import LogbookReaderLike
-import logging
-from HDF5Translator.translator_elements import TranslationElement
-from HDF5Translator.translator import process_translation_element
-from datetime import datetime
 from utilities import get_configuration
+from YMD_class import YMD, extract_metadata_from_path
 
 doc = """
 This processing step finds the correct mask file for this measurement and adds it to the metadata
@@ -19,22 +19,26 @@ This processing step finds the correct mask file for this measurement and adds i
 can_process_repetitions_in_parallel = True
 
 
-def can_run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: LogbookReaderLike | None, logger: logging.Logger) -> bool:
+def can_run(
+    dir_path: Path, defaults: DefaultsCarrier, logbook_reader: LogbookReaderLike | None, logger: logging.Logger
+) -> bool:
     """
     Checks if the translator step should run.
     """
     ymd, batch, repetition = extract_metadata_from_path(dir_path)
-    step_2_file = dir_path / f'MOUSE_{ymd}_{batch}_{repetition}.nxs'
+    step_2_file = dir_path / f"MOUSE_{ymd}_{batch}_{repetition}.nxs"
     if not step_2_file.is_file():
         logger.warning(f"Mask file determination not possible for {dir_path}, file missing at: {step_2_file}")
         return False
     return True
 
 
-def find_appropriate_mask(defaults: DefaultsCarrier, measurement_ymd: YMD, configuration: int, logger: logging.Logger) -> Path:
+def find_appropriate_mask(
+    defaults: DefaultsCarrier, measurement_ymd: YMD, configuration: int, logger: logging.Logger
+) -> Path:
     """
     Finds the appropriate mask file based on measurement ymd and configuration.
-    
+
     :param defaults: An instance of DefaultsCarrier containing default paths.
     :param measurement_ymd: `ymd` string of the measurement in format YYYYMMDD.
     :param configuration: Configuration number to match.
@@ -49,17 +53,17 @@ def find_appropriate_mask(defaults: DefaultsCarrier, measurement_ymd: YMD, confi
     for mask_file in mask_files:
         try:
             # Extract ymd from file name
-            mask_ymd_str, mask_configuration_str = mask_file.stem.split('_')
+            mask_ymd_str, mask_configuration_str = mask_file.stem.split("_")
             mask_ymd = datetime.strptime(mask_ymd_str, "%Y%m%d")
             mask_configuration = int(mask_configuration_str)
 
             # Check for matching configuration
             if mask_configuration == configuration:
                 matching_masks.append((mask_file, mask_ymd))
-        
+
         except Exception as e:
             logger.error(f"Error processing file {mask_file}: {e}")
-    
+
     # Find the mask with the nearest `ymd` before or on measurement_ymd
     measurement_date = datetime.strptime(measurement_ymd.YMD, "%Y%m%d")
     best_mask = None
@@ -77,7 +81,7 @@ def find_appropriate_mask(defaults: DefaultsCarrier, measurement_ymd: YMD, confi
         # print(f"Selected mask file: {best_mask}")
     else:
         logger.warning(f"No suitable mask found for configuration {configuration} before {measurement_ymd}.")
-    
+
     return best_mask
 
 
@@ -87,7 +91,7 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: LogbookReader
     """
     try:
         ymd, batch, repetition = extract_metadata_from_path(dir_path)
-        input_file = dir_path / f'MOUSE_{ymd}_{batch}_{repetition}.nxs'
+        input_file = dir_path / f"MOUSE_{ymd}_{batch}_{repetition}.nxs"
         logger.info(f"Starting mask determination for {input_file}")
         configuration = get_configuration(input_file, logger)
         mask_file = find_appropriate_mask(defaults, ymd, configuration, logger)
@@ -118,7 +122,7 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: LogbookReader
                 data_type="string",
                 default_value=str(mask_file.relative_to(input_file.parent, walk_up=True)),
                 attributes={
-                    "note": f"Added by the processstep_add_mask_file, relative to the location of the original preprocessed file."
+                    "note": "Added by the processstep_add_mask_file, relative to the location of the original preprocessed file."
                 },
             ),
         ]
@@ -128,13 +132,13 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: LogbookReader
             for element in TElements:  # iterate over the two elements and write them back
                 process_translation_element(h5_in, h5_out, element)
 
-        # # write filename to HDF5 file: 
+        # # write filename to HDF5 file:
         # with h5py.File(input_file, 'a') as h5f:
         #     mask_file_dataset = h5f.require_dataset('/entry1/processing_required_metadata/mask_file', shape=(), dtype=h5py.special_dtype(vlen=str))
         #     mask_file_dataset[...] = str(mask_file.relative_to(input_file.parent, walk_up=True))
         logger.info(f"Completed translator step for {input_file}")
     except Exception as e:
         # Print the standard output and standard error
-        logger.info(f"Processstep processstep_add_mask_file failed with stderr:")
+        logger.info("Processstep processstep_add_mask_file failed with stderr:")
         logger.info(e)
         logger.error(f"Error during translator subprocess: {e}")

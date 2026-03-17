@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
 from types import SimpleNamespace
 
 import processstep_translator_step_2
@@ -8,7 +7,10 @@ import processstep_translator_step_2
 
 def test_translator_step_2_shells_out_to_hdf5translator(mini_dataset, monkeypatch):
     calls: list[list[str]] = []
-    step_1_file = mini_dataset.repetition_dir / f"MOUSE_{mini_dataset.ymd}_{mini_dataset.batch_num}_{mini_dataset.repetition}_step_1.nxs"
+    step_1_file = (
+        mini_dataset.repetition_dir
+        / f"MOUSE_{mini_dataset.ymd}_{mini_dataset.batch_num}_{mini_dataset.repetition}_step_1.nxs"
+    )
     input_file = mini_dataset.repetition_dir / "eiger_1_master.h5"
     step_1_file.write_bytes(b"step1")
     input_file.write_bytes(b"master")

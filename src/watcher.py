@@ -1,16 +1,15 @@
-import os
-import subprocess
 import argparse
-from pathlib import Path
-from watchdog.observers import Observer
-from watchdog.events import FileSystemEventHandler, FileSystemEvent
 import logging
 import time
+from pathlib import Path
 
-from YMD_class import extract_metadata_from_path
-from directory_processor import DirectoryProcessor
+from watchdog.events import FileSystemEvent, FileSystemEventHandler
+from watchdog.observers import Observer
+
+from checkers import already_processed, processing_possible
 from defaults_carrier import DefaultsCarrier, load_config_from_yaml
-from checkers import processing_possible, already_processed
+from directory_processor import DirectoryProcessor
+from YMD_class import extract_metadata_from_path
 
 logging.basicConfig(level=logging.INFO)
 
@@ -30,7 +29,7 @@ class WatcherFileSystemEventHandler(FileSystemEventHandler):
             if depth > self.max_depth:
                 self.logger.info(f"Skipping subdirectory: {dir_path}")
                 return
-            
+
             if already_processed(dir_path):
                 self.logger.info(f"Directory already processed: {dir_path}")
                 return
@@ -47,12 +46,7 @@ class WatcherFileSystemEventHandler(FileSystemEventHandler):
                 if processing_possible(dir_path):
                     self.logger.info(f"Processing possible for {dir_path}")
                     ymd, batch, repetition = extract_metadata_from_path(dir_path)
-                    self.processor.process_directory(
-                        single_dir=dir_path,
-                        ymd=ymd,
-                        batch=batch,
-                        repetition=repetition
-                    )
+                    self.processor.process_directory(single_dir=dir_path, ymd=ymd, batch=batch, repetition=repetition)
                     return
                 else:
                     self.logger.info(f"Waiting for directory to stabilize: {dir_path}")
@@ -63,11 +57,8 @@ class WatcherFileSystemEventHandler(FileSystemEventHandler):
 
 def main():
     parser = argparse.ArgumentParser(description="Watch a directory tree for changes and process new directories.")
-    parser.add_argument(
-        "input_path",
-        help="The top-level directory path to monitor."
-    )
-    parser.add_argument('--config', type=str, required=True, help="Path to the configuration yaml file.")
+    parser.add_argument("input_path", help="The top-level directory path to monitor.")
+    parser.add_argument("--config", type=str, required=True, help="Path to the configuration yaml file.")
 
     args = parser.parse_args()
 
@@ -76,21 +67,23 @@ def main():
     logger = logging.getLogger(__name__)
 
     steps = [
-        'processstep_translator_step_1',
-        'processstep_translator_step_2',
-        'processstep_beamanalysis',
-        'processstep_cleanup_files',
-        'processstep_add_mask_file',
-        'processstep_metadata_update',
-        'processstep_add_background_files',
-        'processstep_thickness_from_absorption',
-        'processstep_transmission_thickness_flux_table',
+        "processstep_translator_step_1",
+        "processstep_translator_step_2",
+        "processstep_beamanalysis",
+        "processstep_cleanup_files",
+        "processstep_add_mask_file",
+        "processstep_metadata_update",
+        "processstep_add_background_files",
+        "processstep_thickness_from_absorption",
+        "processstep_transmission_thickness_flux_table",
         # 'processstep_stacker'
     ]
 
     processor = DirectoryProcessor(defaults=defaults, steps=steps)
 
-    event_handler = WatcherFileSystemEventHandler(processor=processor, logger=logger, base_path=Path(args.input_path), max_depth=1)
+    event_handler = WatcherFileSystemEventHandler(
+        processor=processor, logger=logger, base_path=Path(args.input_path), max_depth=1
+    )
     observer = Observer()
     observer.schedule(event_handler, path=args.input_path, recursive=True)
 
@@ -102,6 +95,7 @@ def main():
     except KeyboardInterrupt:
         observer.stop()
     observer.join()
+
 
 if __name__ == "__main__":
     main()

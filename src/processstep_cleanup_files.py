@@ -1,9 +1,10 @@
-from pathlib import Path
+import logging
 import subprocess
-from YMD_class import extract_metadata_from_path
+from pathlib import Path
+
 from defaults_carrier import DefaultsCarrier
 from logbook_support import LogbookReaderLike
-import logging
+from YMD_class import extract_metadata_from_path
 
 doc = """
 This processing step cleans up the temporary and intermediate files created during the processing
@@ -12,27 +13,27 @@ This processing step cleans up the temporary and intermediate files created duri
 # Flag indicating whether this process step can be executed in parallel on multiple repetitions
 can_process_repetitions_in_parallel = True
 
-def can_run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: LogbookReaderLike | None, logger: logging.Logger) -> bool:
+
+def can_run(
+    dir_path: Path, defaults: DefaultsCarrier, logbook_reader: LogbookReaderLike | None, logger: logging.Logger
+) -> bool:
     """
     Checks if the translator step should run.
     """
-    return True # can always run this step
+    return True  # can always run this step
+
 
 def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: LogbookReaderLike | None, logger: logging.Logger):
     """
     Executes the translator processing step.
     """
     ymd, batch, repetition = extract_metadata_from_path(dir_path)
-    step_1_file = dir_path / f'MOUSE_{ymd}_{batch}_{repetition}_step_1.nxs'
+    step_1_file = dir_path / f"MOUSE_{ymd}_{batch}_{repetition}_step_1.nxs"
     # add any other temporary files that might be created during processing
 
     try:
-        filenames = [
-            step_1_file
-        ]
-        cmd = [
-            'rm', '-f', *filenames
-        ]
+        filenames = [step_1_file]
+        cmd = ["rm", "-f", *filenames]
         logger.info(f"Starting cleanup step for {ymd=}, {batch=}, {repetition=}")
         result = subprocess.run(cmd, check=True, capture_output=True, text=True)
         logger.debug(result.stdout)

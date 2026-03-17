@@ -1,8 +1,9 @@
-import yaml
-from typing import Optional
-import attrs
-from pathlib import Path
 import logging
+from pathlib import Path
+from typing import Optional
+
+import attrs
+import yaml
 
 
 # Validators and Converters
@@ -31,7 +32,7 @@ def load_config_from_yaml(file_path: str) -> dict:
     Load configuration from a YAML file.
     """
     try:
-        with open(file_path, 'r') as yaml_file:
+        with open(file_path, "r") as yaml_file:
             return yaml.safe_load(yaml_file) or {}
     except FileNotFoundError:
         raise FileNotFoundError(f"Configuration file '{file_path}' not found.")
@@ -45,19 +46,32 @@ class DefaultsCarrier:
     """
     A class to manage default paths and settings.
     """
+
     vsi_root: Path = attrs.field(converter=Path, validator=[if_not_none_is_path_and_exists])
     post_translation_dir: Path = attrs.field(converter=Path, validator=[if_not_none_is_path_and_exists])
     translator_template_dir: Path = attrs.field(converter=Path, validator=[if_not_none_is_path_and_exists])
 
-    saxs_dir: Optional[Path] = attrs.field(default=None, converter=convert_to_path_or_none, validator=[if_not_none_is_path_and_exists])
-    data_dir: Optional[Path] = attrs.field(default=None, converter=convert_to_path_or_none, validator=[if_not_none_is_path_and_exists])
-    masks_dir: Optional[Path] = attrs.field(default=None, converter=convert_to_path_or_none, validator=[if_not_none_is_path_and_exists])
-    projects_dir: Optional[Path] = attrs.field(default=None, converter=convert_to_path_or_none, validator=[if_not_none_is_path_and_exists])
+    saxs_dir: Optional[Path] = attrs.field(
+        default=None, converter=convert_to_path_or_none, validator=[if_not_none_is_path_and_exists]
+    )
+    data_dir: Optional[Path] = attrs.field(
+        default=None, converter=convert_to_path_or_none, validator=[if_not_none_is_path_and_exists]
+    )
+    masks_dir: Optional[Path] = attrs.field(
+        default=None, converter=convert_to_path_or_none, validator=[if_not_none_is_path_and_exists]
+    )
+    projects_dir: Optional[Path] = attrs.field(
+        default=None, converter=convert_to_path_or_none, validator=[if_not_none_is_path_and_exists]
+    )
 
-    logbook_file: Optional[Path] = attrs.field(default=None, converter=convert_to_path_or_none, validator=[if_not_none_is_path_and_exists])
-    stacker_config_file: Optional[Path] = attrs.field(default=None, converter=convert_to_path_or_none, validator=[if_not_none_is_path_and_exists])
+    logbook_file: Optional[Path] = attrs.field(
+        default=None, converter=convert_to_path_or_none, validator=[if_not_none_is_path_and_exists]
+    )
+    stacker_config_file: Optional[Path] = attrs.field(
+        default=None, converter=convert_to_path_or_none, validator=[if_not_none_is_path_and_exists]
+    )
 
-    logging_level: str = attrs.field(default='INFO', converter=str)
+    logging_level: str = attrs.field(default="INFO", converter=str)
     profile_steps: bool = attrs.field(default=True)
     log_to_file: bool = attrs.field(default=False)
     log_file: Optional[Path] = attrs.field(default=None, converter=convert_to_path_or_none)
@@ -70,12 +84,14 @@ class DefaultsCarrier:
         self._setup_logger()
 
         # Set defaults for optional paths
-        self.saxs_dir = self.saxs_dir or self.vsi_root / 'Measurements' / 'SAXS002'
-        self.data_dir = self.data_dir or self.saxs_dir / 'data'
-        self.masks_dir = self.masks_dir or self.data_dir / 'Masks'
-        self.logbook_file = self.logbook_file or self.saxs_dir / 'logbooks' / 'logbook_MOUSE.xlsx'
-        self.stacker_config_file = self.stacker_config_file or self.data_dir / 'StackerConfigurations' / 'stacker_config.yaml'
-        self.projects_dir = self.projects_dir or self.vsi_root / 'Proposals' / 'SAXS002'
+        self.saxs_dir = self.saxs_dir or self.vsi_root / "Measurements" / "SAXS002"
+        self.data_dir = self.data_dir or self.saxs_dir / "data"
+        self.masks_dir = self.masks_dir or self.data_dir / "Masks"
+        self.logbook_file = self.logbook_file or self.saxs_dir / "logbooks" / "logbook_MOUSE.xlsx"
+        self.stacker_config_file = (
+            self.stacker_config_file or self.data_dir / "StackerConfigurations" / "stacker_config.yaml"
+        )
+        self.projects_dir = self.projects_dir or self.vsi_root / "Proposals" / "SAXS002"
 
         self.logger.info("DefaultsCarrier initialized with provided or default paths.")
 
@@ -83,7 +99,7 @@ class DefaultsCarrier:
         """
         Configure logging for the carrier.
         """
-        self.logger = logging.getLogger('DefaultsCarrier')
+        self.logger = logging.getLogger("DefaultsCarrier")
         self.logger.handlers.clear()
         self.logger.setLevel(self.logging_level.upper())
 
@@ -106,28 +122,29 @@ def create_defaults_carrier_from_config(config_file: Optional[str] = None) -> De
     """
     config = load_config_from_yaml(config_file) if config_file else {}
 
-    required_keys = ['vsi_root', 'post_translation_dir', 'translator_template_dir']
+    required_keys = ["vsi_root", "post_translation_dir", "translator_template_dir"]
     missing_keys = [key for key in required_keys if key not in config]
     if missing_keys:
         raise ValueError(f"Missing required configuration keys: {', '.join(missing_keys)}")
 
     return DefaultsCarrier(
-        vsi_root=config.get('vsi_root'),
-        post_translation_dir=config.get('post_translation_dir'),
-        translator_template_dir=config.get('translator_template_dir'),
-        saxs_dir=config.get('saxs_dir', None),
-        data_dir=config.get('data_dir', None),
-        masks_dir=config.get('masks_dir', None),
-        logbook_file=config.get('logbook_file', None),
-        stacker_config_file=config.get('stacker_config_file', None),
-        projects_dir=config.get('projects_dir', None),
-        logging_level=config.get('logging_level', 'INFO'),
-        profile_steps=config.get('profile_steps', True),
-        log_to_file=config.get('log_to_file', False),
-        log_file=config.get('log_file', None)
+        vsi_root=config.get("vsi_root"),
+        post_translation_dir=config.get("post_translation_dir"),
+        translator_template_dir=config.get("translator_template_dir"),
+        saxs_dir=config.get("saxs_dir", None),
+        data_dir=config.get("data_dir", None),
+        masks_dir=config.get("masks_dir", None),
+        logbook_file=config.get("logbook_file", None),
+        stacker_config_file=config.get("stacker_config_file", None),
+        projects_dir=config.get("projects_dir", None),
+        logging_level=config.get("logging_level", "INFO"),
+        profile_steps=config.get("profile_steps", True),
+        log_to_file=config.get("log_to_file", False),
+        log_file=config.get("log_file", None),
     )
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     # Example: Loading from a YAML configuration
     defaults = create_defaults_carrier_from_config("MOUSE_settings.yaml")
     # print(defaults.data_dir)

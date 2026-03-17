@@ -5,7 +5,7 @@
 Post-Translation HDF5 Processor
 
 This script performs post-translation steps on HDF5 files, including reading information,
-performing calculations (e.g. for determining beam centers, transmission factors and other 
+performing calculations (e.g. for determining beam centers, transmission factors and other
 derived information), and writes the result back into the HDF5 structure of the original file.
 
 Usage:
@@ -14,8 +14,8 @@ Usage:
 Replace the calculation and file read/write logic according to your specific requirements.
 
 This example determines a beam center, transmission and flux from a beamstopless measurement.
-The path can be specified on the command line, meaning the same operation can be used on the 
-direct beam measurement as well as the sample beam measurement. 
+The path can be specified on the command line, meaning the same operation can be used on the
+direct beam measurement as well as the sample beam measurement.
 
 This is an operation which is normally done in the MOUSE procedure
 requires scikit-image
@@ -24,22 +24,20 @@ requires scikit-image
 import argparse
 import logging
 from pathlib import Path
-from typing import Tuple, Union, Optional
-import hdf5plugin  # loaded BEFORE h5py
+from typing import Optional, Union
+
 import h5py
 import numpy as np
-from skimage.measure import regionprops
-from skimage import measure, morphology # for new beam analysis
-from HDF5Translator.utils.data_utils import sanitize_attribute
-from HDF5Translator.utils.validators import (
-    validate_file
-)
+from HDF5Translator.translator import process_translation_element
+from HDF5Translator.translator_elements import TranslationElement
 from HDF5Translator.utils.argparse_utils import KeyValueAction
 from HDF5Translator.utils.configure_logging import configure_logging
-from HDF5Translator.translator_elements import TranslationElement
-from HDF5Translator.translator import process_translation_element
 from HDF5Translator.utils.data_utils import getFromKeyVals
-from utilities import reduce_extra_image_dimensions, prepare_eiger_image, label_main_feature
+from HDF5Translator.utils.validators import validate_file
+from skimage import measure  # for new beam analysis
+from skimage.measure import regionprops
+
+from utilities import label_main_feature, prepare_eiger_image, reduce_extra_image_dimensions
 
 description = """
 This script is an example on how to perform post-translation operations on HDF5 files.
@@ -48,20 +46,20 @@ performing calculations (e.g. for determining beam centers, transmission factors
 derived information), and writes the result back into the HDF5 structure of the original file.
 
 The example includes universal command-line arguments for specifying the input file,
-auxiliary files, and verbosity level. It includes validators and a logging engine. There is also 
+auxiliary files, and verbosity level. It includes validators and a logging engine. There is also
 the option of supplying key-value pairs for additional parameters to your operation.
 
 You can replace the calculation and file read/write logic according to your specific requirements.
 """
 
 
-def new_beam_analysis(imageData: np.ndarray, coverage: float = 0.997, ellipse_mask:Optional[np.ndarray] = None) -> Union[tuple, float, np.ndarray]:
-    
+def new_beam_analysis(
+    imageData: np.ndarray, coverage: float = 0.997, ellipse_mask: Optional[np.ndarray] = None
+) -> Union[tuple, float, np.ndarray]:
+
     def _ellipse_mask_from_regionprops(
-            reg: measure._regionprops.RegionProperties,
-            shape,
-            coverage: float
-            ) -> Union[np.ndarray, np.ndarray]:
+        reg: measure._regionprops.RegionProperties, shape, coverage: float
+    ) -> Union[np.ndarray, np.ndarray]:
         """
         Build a full-image boolean mask of the k·σ ellipse defined by the
         region's intensity-weighted centroid and covariance, where k gives
@@ -70,16 +68,15 @@ def new_beam_analysis(imageData: np.ndarray, coverage: float = 0.997, ellipse_ma
         # 1) center and weighted moments
         cy, cx = reg.weighted_centroid
         mu_c = reg.weighted_moments_central
-        m00  = reg.weighted_moments[0, 0]
+        m00 = reg.weighted_moments[0, 0]
         if m00 <= 0:
             return np.zeros(shape, dtype=bool)
 
         # 2) covariance (row, col)
-        var_r  = mu_c[0, 2] / m00
-        var_c  = mu_c[2, 0] / m00
+        var_r = mu_c[0, 2] / m00
+        var_c = mu_c[2, 0] / m00
         cov_rc = mu_c[1, 1] / m00
-        cov = np.array([[var_r, cov_rc],
-                        [cov_rc, var_c]], dtype=float)
+        cov = np.array([[var_r, cov_rc], [cov_rc, var_c]], dtype=float)
         cov = (cov + cov.T) / 2.0  # symmetrize
         cov_inv = np.linalg.inv(cov + 1e-12 * np.eye(2))
 
@@ -91,15 +88,11 @@ def new_beam_analysis(imageData: np.ndarray, coverage: float = 0.997, ellipse_ma
         rr, cc = np.indices(shape)
         dr = rr - cy
         dc = cc - cx
-        md2 = (
-            cov_inv[0, 0]*dr*dr +
-            2.0*cov_inv[0, 1]*dr*dc +
-            cov_inv[1, 1]*dc*dc
-            )
-        
+        md2 = cov_inv[0, 0] * dr * dr + 2.0 * cov_inv[0, 1] * dr * dc + cov_inv[1, 1] * dc * dc
+
         # --- Peak widths (σ) and orientation ---
         evals, evecs = np.linalg.eigh(cov)  # eigenvalues ascending
-        evals = np.clip(evals, 0.0, None)      # no negative variances
+        evals = np.clip(evals, 0.0, None)  # no negative variances
         sigma_minor, sigma_major = np.sqrt(evals[0]), np.sqrt(evals[1])
 
         # Orientation of major axis (CCW from row-axis)
@@ -109,27 +102,21 @@ def new_beam_analysis(imageData: np.ndarray, coverage: float = 0.997, ellipse_ma
         return md2 <= (k**2), md2, sigma_minor, sigma_major, theta
 
     def refine_k_for_exact_coverage(
-            md2, 
-            base_mask, 
-            img, 
-            target, 
-            k_lo:float=0.5, 
-            k_hi:float=5.0, 
-            steps:int=8
-            ) -> float:
+        md2, base_mask, img, target, k_lo: float = 0.5, k_hi: float = 5.0, steps: int = 8
+    ) -> float:
         """
-            Real peaks deviate from perfect Gaussians. This bisection nudges k
-            so the integrated fraction over your peak matches the target: - GPT code
+        Real peaks deviate from perfect Gaussians. This bisection nudges k
+        so the integrated fraction over your peak matches the target: - GPT code
         """
         total = float(img[base_mask].sum())
         for _ in range(steps):
-            k_mid = 0.5*(k_lo + k_hi)
-            frac = float(img[(md2 <= k_mid*k_mid) & base_mask].sum()) / total
+            k_mid = 0.5 * (k_lo + k_hi)
+            frac = float(img[(md2 <= k_mid * k_mid) & base_mask].sum()) / total
             if frac < target:
                 k_lo = k_mid
             else:
                 k_hi = k_mid
-        return 0.5*(k_lo + k_hi)
+        return 0.5 * (k_lo + k_hi)
 
     # Now you can do operations, such as determining a beam center and flux. For that, we need to
     # do a few steps...
@@ -139,10 +126,11 @@ def new_beam_analysis(imageData: np.ndarray, coverage: float = 0.997, ellipse_ma
     maskedTwoDImage = prepare_eiger_image(imageData, logging.getLogger())
     sigma_minor, sigma_major, theta = None, None, None
     if ellipse_mask is not None:
-        assert ellipse_mask.shape == maskedTwoDImage.shape, "Provided ellipse_mask must have the same shape as imageData"
+        assert ellipse_mask.shape == maskedTwoDImage.shape, (
+            "Provided ellipse_mask must have the same shape as imageData"
+        )
         ellipse_mask = ellipse_mask.astype(int)
     else:
-
         labels = label_main_feature(maskedTwoDImage, logging.getLogger())
         # step 4: calculate region properties
         properties = regionprops(labels, maskedTwoDImage)  # calculate initial region properties
@@ -150,15 +138,13 @@ def new_beam_analysis(imageData: np.ndarray, coverage: float = 0.997, ellipse_ma
         # GPT addition:
         coverage_target = coverage
         ellipse_mask, md2, sigma_minor, sigma_major, theta = _ellipse_mask_from_regionprops(
-            properties[0],
-            maskedTwoDImage.shape,
-            coverage_target
-            )
+            properties[0], maskedTwoDImage.shape, coverage_target
+        )
         # Keep the ellipse inside the original label to avoid bleeding into neighbors
         # ellipse_mask &= (labels.astype(bool))
-        # refine for the actual peak not a gaussian peak: 
+        # refine for the actual peak not a gaussian peak:
         k = refine_k_for_exact_coverage(md2, (labels > 0), maskedTwoDImage, coverage_target)
-        ellipse_mask = (md2 <= k*k) & (labels > 0)
+        ellipse_mask = (md2 <= k * k) & (labels > 0)
         kept_intensity = float(maskedTwoDImage[ellipse_mask].sum())
         achieved_coverage = kept_intensity / properties[0].intensity_image.sum()
         print(f"Refined k={k:.3f} to achieve coverage {achieved_coverage:.4f} ({coverage_target=})")
@@ -199,9 +185,7 @@ def main(
     imageType = getFromKeyVals(
         "image_type", keyvals, "direct_beam"
     )  # can be either direct_beam or sample_beam. This sets the paths and the output location
-    logging.info(
-        f"Processing {imageType} image in file {filename}"
-    )
+    logging.info(f"Processing {imageType} image in file {filename}")
 
     # Define the paths in the HDF5 file where the data is stored and where the results should be written
     TransmissionOutPath = "/entry1/sample/transmission"
@@ -218,9 +202,7 @@ def main(
     BeamMaskPath = "/entry1/processing/direct_beam_profile/beam_analysis/BeamMask"
     if imageType == "direct_beam":
         BeamDatapath = "/entry1/processing/direct_beam_profile/data"
-        BeamDurationPath = (
-            "/entry1/processing/direct_beam_profile/frame_time"
-        )
+        BeamDurationPath = "/entry1/processing/direct_beam_profile/frame_time"
         COMOutPath = "/entry1/processing/direct_beam_profile/beam_analysis/centerOfMass"
         xOutPath = "/entry1/instrument/detector00/transformations/det_y"
         zOutPath = "/entry1/instrument/detector00/transformations/det_z"
@@ -228,9 +210,7 @@ def main(
         FluxOverImagePath = DirectFluxOverImagePath
     elif imageType == "sample_beam":
         BeamDatapath = "/entry1/processing/sample_beam_profile/data"
-        BeamDurationPath = (
-            "/entry1/processing/sample_beam_profile/frame_time"
-        )
+        BeamDurationPath = "/entry1/processing/sample_beam_profile/frame_time"
         COMOutPath = "/entry1/processing/sample_beam_profile/beam_analysis/centerOfMass"
         xOutPath = None  # no need to store these as we get the beam center from the direct beam
         zOutPath = None
@@ -238,16 +218,14 @@ def main(
         FluxOverImagePath = SampleFluxOverImagePath
 
     else:
-        logging.error(
-            f"Unknown image type: {imageType}. Please specify either 'direct_beam' or 'sample_beam'."
-        )
+        logging.error(f"Unknown image type: {imageType}. Please specify either 'direct_beam' or 'sample_beam'.")
         return
 
     # reading from the main HDF5 file
     with h5py.File(filename, "r") as h5_in:
         # Read necessary information (this is just a placeholder, adapt as needed)
         imageData = h5_in[BeamDatapath][()]
-        # mean because count_time is the frame time minus the readout time. 
+        # mean because count_time is the frame time minus the readout time.
         recordingTime = h5_in[BeamDurationPath][()]
         # read the beam mask if it exists (for sample beam analysis), otherwise None
         ellipse_mask = h5_in.get(BeamMaskPath, default=None)
@@ -259,7 +237,9 @@ def main(
             ellipse_mask = None
 
     if imageType == "sample_beam":
-        assert ellipse_mask is not None, "For sample_beam analysis, the beam mask must be provided from the direct_beam analysis."
+        assert ellipse_mask is not None, (
+            "For sample_beam analysis, the beam mask must be provided from the direct_beam analysis."
+        )
 
     imageData = reduce_extra_image_dimensions(imageData, method=np.mean)
 
@@ -267,13 +247,9 @@ def main(
     # do a few steps...
     # center_of_mass, ITotal_region = beam_analysis(imageData, ROI_SIZE)
     center_of_mass, ITotal_region, ITotal_overall, ellipse_mask, sigma_minor, sigma_major, theta = new_beam_analysis(
-        imageData,
-        coverage=0.997,
-        ellipse_mask=ellipse_mask
-        )
-    logging.info(
-        f"Beam center: {center_of_mass}, Flux: {ITotal_region / recordingTime} counts/s."
+        imageData, coverage=0.997, ellipse_mask=ellipse_mask
     )
+    logging.info(f"Beam center: {center_of_mass}, Flux: {ITotal_region / recordingTime} counts/s.")
     # Now we start the write-back to the HDF5 file, using the TranslationElement class
     # This class lets you configure exactly what the output should look like in the HDF5 file.
     TElements = []  # we want to add two elements, so I make a list
@@ -415,12 +391,12 @@ def main(
                 destination=TransmissionCorrectionFactorOutPath,
                 minimum_dimensionality=1,
                 data_type="float32",
-                default_value=transmission_image/transmission,
+                default_value=transmission_image / transmission,
                 destination_units="",
                 attributes={
                     "note": "Correction factor to multiply with beam transmission to get approximate true transmission, determined by the beam_analysis post-translation processing script, overwritten later by the value from the measurement with the closest detector position."
                 },
-            )
+            ),
         ]
 
     if sigma_minor is not None and sigma_major is not None and theta is not None:
@@ -477,9 +453,7 @@ def setup_argparser():
     Returns:
         argparse.Namespace: Parsed arguments.
     """
-    parser = argparse.ArgumentParser(
-        description=description, formatter_class=argparse.RawDescriptionHelpFormatter
-    )
+    parser = argparse.ArgumentParser(description=description, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument(
         "-f",
         "--filename",

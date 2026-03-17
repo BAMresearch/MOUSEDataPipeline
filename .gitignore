@@ -163,3 +163,5 @@ src/tests/testdata/mouse_single
 src/tests/testdata/.DS_Store
 *DS_Store
 example_configurations/*/*
+uv.lock
+.ruff_cache/

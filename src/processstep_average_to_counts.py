@@ -1,21 +1,21 @@
-from pathlib import Path
+import logging
 import subprocess
+from pathlib import Path
 
 import h5py
-import numpy as np
-from YMD_class import YMD, extract_metadata_from_path
+from pint import UnitRegistry
+
 from defaults_carrier import DefaultsCarrier
 from logbook_support import LogbookReaderLike
-import logging
-from pint import UnitRegistry
 from utilities import get_float_from_h5
+from YMD_class import extract_metadata_from_path
 
 # Initialize the unit registry
 ureg = UnitRegistry()
 
 doc = """
 This processing step converts the averaged frame data (in instrument/detector00/data) and its
-uncertainties to counts by multiplying with the number of frames. 
+uncertainties to counts by multiplying with the number of frames.
 It also adjusts the count_time accordingly.
 """
 
@@ -23,12 +23,14 @@ It also adjusts the count_time accordingly.
 can_process_repetitions_in_parallel = True
 
 
-def can_run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: LogbookReaderLike | None, logger: logging.Logger) -> bool:
+def can_run(
+    dir_path: Path, defaults: DefaultsCarrier, logbook_reader: LogbookReaderLike | None, logger: logging.Logger
+) -> bool:
     """
     Checks if the translator step could run.
     """
     ymd, batch, repetition = extract_metadata_from_path(dir_path)
-    step_2_file = dir_path / f'MOUSE_{ymd}_{batch}_{repetition}.nxs'
+    step_2_file = dir_path / f"MOUSE_{ymd}_{batch}_{repetition}.nxs"
     if not step_2_file.is_file():
         logger.info(f"metadata_updater cannot run in {dir_path}, file missing at: {step_2_file}")
         return False
@@ -42,19 +44,19 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: LogbookReader
     """
 
     ymd, batch, repetition = extract_metadata_from_path(dir_path)
-    input_file = dir_path / f'MOUSE_{ymd}_{batch}_{repetition}.nxs'
+    input_file = dir_path / f"MOUSE_{ymd}_{batch}_{repetition}.nxs"
     # get the logbook entry for this measurement
-    n_frames = get_float_from_h5(input_file, '/entry1/instrument/detector00/averaged_number_of_frames', logger)
+    n_frames = get_float_from_h5(input_file, "/entry1/instrument/detector00/averaged_number_of_frames", logger)
 
     if n_frames == 0.0:
         logger.warning(f"could not find number of averaged frames in {input_file}, skipping update")
         return
 
     convert_paths = [
-        '/entry1/instrument/detector00/data',
-        '/entry1/instrument/detector00/data_uncertainties_poisson',
-        '/entry1/instrument/detector00/data_uncertainties_sem',
-        '/entry1/instrument/detector00/count_time',
+        "/entry1/instrument/detector00/data",
+        "/entry1/instrument/detector00/data_uncertainties_poisson",
+        "/entry1/instrument/detector00/data_uncertainties_sem",
+        "/entry1/instrument/detector00/count_time",
     ]
 
     try:
@@ -65,12 +67,14 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: LogbookReader
             for path in convert_paths:
                 # let's hope I can do this inplace
                 h5_out[path][...] *= n_frames
-                oldnote = h5_out[path].attrs.get('note', '')
+                oldnote = h5_out[path].attrs.get("note", "")
                 if isinstance(oldnote, bytes):
-                    oldnote = oldnote.decode('utf-8')
+                    oldnote = oldnote.decode("utf-8")
 
                 # update the notes to reflect the situation
-                h5_out[path].attrs['note'] = f"Converted from averaged data to counts by multiplying with {n_frames} frames. \n Original note: {oldnote}"
+                h5_out[path].attrs["note"] = (
+                    f"Converted from averaged data to counts by multiplying with {n_frames} frames. \n Original note: {oldnote}"
+                )
 
         logger.info(f"Completed average_to_counts for {input_file}")
     except subprocess.CalledProcessError as e:

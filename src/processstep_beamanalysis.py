@@ -1,25 +1,29 @@
-from pathlib import Path
+import logging
 import subprocess
-from YMD_class import extract_metadata_from_path
-from checkers import len_files_in_path, processing_possible
+from pathlib import Path
+
 from defaults_carrier import DefaultsCarrier
 from logbook_support import LogbookReaderLike
-import logging
+from YMD_class import extract_metadata_from_path
 
 # Flag indicating whether this process step can be executed in parallel on multiple repetitions
 can_process_repetitions_in_parallel = True
 
-def can_run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: LogbookReaderLike | None, logger: logging.Logger) -> bool:
+
+def can_run(
+    dir_path: Path, defaults: DefaultsCarrier, logbook_reader: LogbookReaderLike | None, logger: logging.Logger
+) -> bool:
     """
-    Checks if the translator step should run. We need the translated file. 
+    Checks if the translator step should run. We need the translated file.
     """
     ymd, batch, repetition = extract_metadata_from_path(dir_path)
-    step_2_file = dir_path / f'MOUSE_{ymd}_{batch}_{repetition}.nxs'
+    step_2_file = dir_path / f"MOUSE_{ymd}_{batch}_{repetition}.nxs"
     if not step_2_file.is_file():
         logger.info(f"Beamanalysis not possible for {dir_path}, file missing at: {step_2_file}")
         return False
 
     return True
+
 
 def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: LogbookReaderLike | None, logger: logging.Logger):
     """
@@ -27,23 +31,28 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: LogbookReader
     """
     ymd, batch, repetition = extract_metadata_from_path(dir_path)
     try:
-
-        # encode: 
+        # encode:
         # python3 ../../src/tools/post_translation_operation_MOUSE_beamanalysis.py -f 20250101_17_0/testBAM_Dadd.nxs -v -k roi_size=25 image_type="sample_beam"
         # python3 ../../src/tools/post_translation_operation_MOUSE_beamanalysis.py -f 20250101_17_0/testBAM_Dadd.nxs -v -k roi_size=25 image_type="direct_beam"
 
-        input_file = dir_path / f'MOUSE_{ymd}_{batch}_{repetition}.nxs'
-        pto_file = defaults.post_translation_dir / 'post_translation_operation_MOUSE_beamanalysis.py'
-        # make sure to run direct_beam before sample_beam, as we need the beam mask from direct_beam. 
+        input_file = dir_path / f"MOUSE_{ymd}_{batch}_{repetition}.nxs"
+        pto_file = defaults.post_translation_dir / "post_translation_operation_MOUSE_beamanalysis.py"
+        # make sure to run direct_beam before sample_beam, as we need the beam mask from direct_beam.
         cmd1 = [
-            'python3', str(pto_file),
-            '-f', str(input_file),
-            '-k', 'image_type=direct_beam',
+            "python3",
+            str(pto_file),
+            "-f",
+            str(input_file),
+            "-k",
+            "image_type=direct_beam",
         ]
         cmd2 = [
-            'python3', str(pto_file),
-            '-f', str(input_file),
-            '-k', 'image_type=sample_beam',
+            "python3",
+            str(pto_file),
+            "-f",
+            str(input_file),
+            "-k",
+            "image_type=sample_beam",
         ]
 
         logger.info(f"Starting beam analysis for {input_file}")

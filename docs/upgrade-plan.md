@@ -31,6 +31,8 @@ The following migration steps are now implemented in this repository:
 - The `repetition=0` orchestration path now works correctly instead of being rejected by truthiness checks.
 - `utilities.py`, `processstep_thickness_from_absorption.py`, and `processstep_make_beam_mask.py` now use explicit validation exceptions instead of runtime `assert` statements in their core guard rails.
 - `ruff`, `pre-commit`, and a repo-level `.pre-commit-config.yaml` have been added for incremental linting and formatting on touched files.
+- `pyproject.toml` now exposes the linting tools both as a `pip` extra and as a `uv` dependency group.
+- `periodictable` and `xraydb` are now declared directly as runtime dependencies because the `mouse_logbook` metadata writer requires them during chemistry and X-ray validation.
 - The current local test suite passes: 20 tests.
 
 What is still transitional:
@@ -83,6 +85,7 @@ Partially complete.
 - `MOUSE_settings.yaml` now documents `profile_steps`.
 - `README.md` now documents editable installation, the `mouse-directory-processor` entry point, and `PYTHON_BIN` for the shell wrapper.
 - `README.md` now also documents `pre-commit` setup and the incremental lint/format workflow.
+- `README.md` now documents how to refresh stale dev-tool environments for both `pip` and `uv`.
 - `pytest` tests now cover:
   - metadata updates via the `mouse-logbook` CLI writer path
   - metadata CLI failure propagation

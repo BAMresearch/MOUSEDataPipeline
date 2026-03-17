@@ -4,6 +4,8 @@ hdf5plugin
 numpy
 scikit-image
 pint
+periodictable
 PyYAML
+xraydb
 git+https://github.com/BAMresearch/HDF5Translator.git
 git+https://github.com/BAMresearch/mouse_logbook.git

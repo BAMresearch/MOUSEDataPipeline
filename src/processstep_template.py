@@ -1,17 +1,21 @@
-from pathlib import Path
+import logging
 import subprocess
+from pathlib import Path
+
 from defaults_carrier import DefaultsCarrier
 from logbook_support import LogbookReaderLike
-import logging
 
 # Flag indicating whether this process step can be executed in parallel on multiple repetitions
 can_process_repetitions_in_parallel = False
 
-def can_run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: LogbookReaderLike | None, logger: logging.Logger) -> bool:
+
+def can_run(
+    dir_path: Path, defaults: DefaultsCarrier, logbook_reader: LogbookReaderLike | None, logger: logging.Logger
+) -> bool:
     """
     Checks if the translator step should run.
     """
-    eiger_file = dir_path / 'im_craw.nxs'
+    eiger_file = dir_path / "im_craw.nxs"
     if eiger_file.exists():
         logger.debug(f"Translator step can run: Found {eiger_file}")
         return True
@@ -24,13 +28,18 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: LogbookReader
     Executes the translator processing step.
     """
     try:
-        input_file = dir_path / 'im_craw.nxs'
-        output_file = dir_path / 'translated.nxs'
+        input_file = dir_path / "im_craw.nxs"
+        output_file = dir_path / "translated.nxs"
         cmd = [
-            'python3', '-m', 'HDF5Translator',
-            '-C', str(defaults.translator_config),
-            '-I', str(input_file),
-            '-O', str(output_file)
+            "python3",
+            "-m",
+            "HDF5Translator",
+            "-C",
+            str(defaults.translator_config),
+            "-I",
+            str(input_file),
+            "-O",
+            str(output_file),
         ]
         logger.info(f"Starting translator step for {input_file}")
         result = subprocess.run(cmd, check=True, capture_output=True, text=True)

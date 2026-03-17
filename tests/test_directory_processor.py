@@ -7,8 +7,8 @@ from types import SimpleNamespace
 import pytest
 
 import directory_processor
-from YMD_class import YMD, extract_metadata_from_path
 from directory_processor import DirectoryProcessor
+from YMD_class import YMD, extract_metadata_from_path
 
 
 def test_directory_processor_startup_is_lazy(mini_dataset):
@@ -90,8 +90,7 @@ def test_directory_processor_propagates_parallel_step_errors(mini_dataset, monke
         can_process_repetitions_in_parallel=True,
         can_run=lambda dir_path, defaults, logbook_reader, logger: True,
         run=lambda dir_path, defaults, logbook_reader, logger: (
-            (_ for _ in ()).throw(RuntimeError("parallel step failed"))
-            if dir_path == second_dir else None
+            (_ for _ in ()).throw(RuntimeError("parallel step failed")) if dir_path == second_dir else None
         ),
     )
 

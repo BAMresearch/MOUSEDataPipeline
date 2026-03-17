@@ -1,26 +1,30 @@
-from pathlib import Path
+import logging
 import subprocess
-from typing import Dict, List
+from pathlib import Path
+from typing import List
 
-import h5py
-from YMD_class import YMD, extract_metadata_from_path
 from defaults_carrier import DefaultsCarrier
 from logbook_support import LogbookReaderLike
-import logging
-
 from utilities import get_processed_files, sort_processed_files_by_instrument_configuration
+from YMD_class import YMD, extract_metadata_from_path
 
 doc = """
 WIP: This special processing step combines all repetitions in a batch.
 """
 
 # Flag indicating whether this process step can be executed in parallel on multiple repetitions
-can_process_repetitions_in_parallel = False  # we do this once per batch, so if we do it for one repetition, we don't need to do it again
+can_process_repetitions_in_parallel = (
+    False  # we do this once per batch, so if we do it for one repetition, we don't need to do it again
+)
 
 
-def processing_needed_for_config(dir_path: Path, ymd: YMD, batch: str, config: str, processed_files: List[Path], logger: logging.Logger) -> bool:
+def processing_needed_for_config(
+    dir_path: Path, ymd: YMD, batch: str, config: str, processed_files: List[Path], logger: logging.Logger
+) -> bool:
     parent_path = dir_path.parent
-    stacked_file = parent_path / f'MOUSE_{ymd.YMD}_{batch}_{config}_stacked.nxs'  # Assuming a naming convention for the stacked file
+    stacked_file = (
+        parent_path / f"MOUSE_{ymd.YMD}_{batch}_{config}_stacked.nxs"
+    )  # Assuming a naming convention for the stacked file
 
     if not processed_files:
         logger.info(f"No processed files found for batch in {dir_path}, cannot run")
@@ -33,19 +37,23 @@ def processing_needed_for_config(dir_path: Path, ymd: YMD, batch: str, config: s
     latest_processed_file = max(processed_files, key=lambda f: f.stat().st_mtime)
 
     if latest_processed_file.stat().st_mtime > stacked_file.stat().st_mtime:
-        logger.info(f"Processed file {latest_processed_file} is newer than stacked file, processing needed for {dir_path}")
+        logger.info(
+            f"Processed file {latest_processed_file} is newer than stacked file, processing needed for {dir_path}"
+        )
         return True
-    
+
     return False
 
 
-def can_run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: LogbookReaderLike | None, logger: logging.Logger) -> bool:
+def can_run(
+    dir_path: Path, defaults: DefaultsCarrier, logbook_reader: LogbookReaderLike | None, logger: logging.Logger
+) -> bool:
     """
-    Checks if the translator step could run. Here, we need to do four things: 
+    Checks if the translator step could run. Here, we need to do four things:
     0) check if there is a stacked file already, if not, we need to run this step.
-    1) use Path.glob to find all the processed files of a batch. 
-    2) check what the latest processed file of this list has as a modification date. 
-    3) check if the date of that latest processed file is newer than the date of the stacked file this process produces. 
+    1) use Path.glob to find all the processed files of a batch.
+    2) check what the latest processed file of this list has as a modification date.
+    3) check if the date of that latest processed file is newer than the date of the stacked file this process produces.
     If 0 or 3 are true, we need to run this step.
     """
     ymd, batch, repetition = extract_metadata_from_path(dir_path)
@@ -68,24 +76,30 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: LogbookReader
     try:
         ymd, batch, repetition = extract_metadata_from_path(dir_path)
         parent_path = dir_path.parent
-        pto_file = defaults.post_translation_dir / 'post_translation_operation_hdf5_stacker.py'
-        processed_files = get_processed_files(dir_path) # [str(f) for f in get_processed_files(dir_path)]
+        pto_file = defaults.post_translation_dir / "post_translation_operation_hdf5_stacker.py"
+        processed_files = get_processed_files(dir_path)  # [str(f) for f in get_processed_files(dir_path)]
         files_by_config = sort_processed_files_by_instrument_configuration(processed_files, logger)
         # print('files_by_config:', files_by_config)
         # did I do this right?
         for config, files in files_by_config.items():
             files_as_str = [str(f) for f in files]
-            stacked_file = parent_path / f'MOUSE_{ymd.YMD}_{batch}_{config}_stacked.nxs'  # Assuming a naming convention for the stacked file
+            stacked_file = (
+                parent_path / f"MOUSE_{ymd.YMD}_{batch}_{config}_stacked.nxs"
+            )  # Assuming a naming convention for the stacked file
             # output_file = dir_path.parent / 'translated.nxs'
             cmd = [
-                'python3', str(pto_file),
-                '-c', str(defaults.stacker_config_file),
-                '-o', str(stacked_file),
-                # '-v', 
+                "python3",
+                str(pto_file),
+                "-c",
+                str(defaults.stacker_config_file),
+                "-o",
+                str(stacked_file),
+                # '-v',
                 # '-l',
-                '-a', *files_as_str, # <-- processed files go here
+                "-a",
+                *files_as_str,  # <-- processed files go here
             ]
-            print(' '.join(cmd))
+            print(" ".join(cmd))
             logger.info(f"Starting stacker step for {parent_path}")
             result = subprocess.run(cmd, check=True, capture_output=True, text=True)
             logger.debug(result.stdout)

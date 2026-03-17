@@ -1,28 +1,29 @@
-from fileinput import filename
-from pathlib import Path
+import logging
 import subprocess
-from YMD_class import extract_metadata_from_path
-from checkers import len_files_in_path, processing_possible
+from pathlib import Path
+
+import h5py
+from HDF5Translator.translator import process_translation_element
+from HDF5Translator.translator_elements import TranslationElement
+from skimage.measure import regionprops
+
 from defaults_carrier import DefaultsCarrier
 from logbook_support import LogbookReaderLike
-import logging
-from utilities import reduce_extra_image_dimensions, prepare_eiger_image, label_main_feature
-from skimage.measure import regionprops
-import numpy as np
-import h5py
-from HDF5Translator.translator_elements import TranslationElement
-from HDF5Translator.translator import process_translation_element
+from utilities import label_main_feature, prepare_eiger_image
+from YMD_class import extract_metadata_from_path
 
 # Flag indicating whether this process step can be executed in parallel on multiple repetitions
 can_process_repetitions_in_parallel = False
 
 
-def can_run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: LogbookReaderLike | None, logger: logging.Logger) -> bool:
+def can_run(
+    dir_path: Path, defaults: DefaultsCarrier, logbook_reader: LogbookReaderLike | None, logger: logging.Logger
+) -> bool:
     """
     Checks if the beam center determination should run. We need the translated file.
     """
     ymd, batch, repetition = extract_metadata_from_path(dir_path)
-    step_2_file = dir_path / f'MOUSE_{ymd}_{batch}_{repetition}.nxs'
+    step_2_file = dir_path / f"MOUSE_{ymd}_{batch}_{repetition}.nxs"
     if not step_2_file.is_file():
         logger.info(f"Beam center determination not possible for {dir_path}, file missing at: {step_2_file}")
         return False
@@ -44,8 +45,7 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: LogbookReader
     # )
     ymd, batch, repetition = extract_metadata_from_path(dir_path)
     try:
-
-        input_file = dir_path / f'MOUSE_{ymd}_{batch}_{repetition}.nxs'
+        input_file = dir_path / f"MOUSE_{ymd}_{batch}_{repetition}.nxs"
 
         logger.info(f"Starting beam analysis for {input_file}")
 
@@ -57,7 +57,7 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: LogbookReader
             # recordingTime = h5_in[BeamDurationPath][()]
         maskedTwoDImage = prepare_eiger_image(imageData, logging.getLogger())
         # create labeled mask:
-        print(f'Looking for main feature in beam center determination for {input_file}')
+        print(f"Looking for main feature in beam center determination for {input_file}")
         labels = label_main_feature(maskedTwoDImage, logging.getLogger())
         # step 4: calculate region properties
         properties = regionprops(labels, maskedTwoDImage)  # calculate region properties

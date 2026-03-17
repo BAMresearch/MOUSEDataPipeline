@@ -7,20 +7,29 @@ name = "mousedatapipeline"
 version = "0.1.0"
 description = "Preprocessing pipeline for MOUSE data before correction."
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     "attrs",
     "h5py",
     "hdf5plugin",
     "numpy",
     "pint",
+    "periodictable",
     "PyYAML",
+    "xraydb",
     "scikit-image",
     "HDF5Translator @ git+https://github.com/BAMresearch/HDF5Translator.git",
     "mouse-logbook @ git+https://github.com/BAMresearch/mouse_logbook.git",
 ]
 
 [project.optional-dependencies]
+dev = [
+    "pre-commit",
+    "pytest",
+    "ruff",
+]
+
+[dependency-groups]
 dev = [
     "pre-commit",
     "pytest",
@@ -66,6 +75,11 @@ py-modules = [
 [tool.ruff]
 line-length = 120
 target-version = "py310"
+extend-exclude = [
+    "tester.ipynb",
+    "src/obsolete_post_translation_operation_MOUSE_beamanalysis.py",
+    "src/obsolete_post_translation_operation_MOUSE_beamcenter.py",
+]
 
 [tool.ruff.lint]
 select = ["E4", "E7", "E9", "F", "I"]

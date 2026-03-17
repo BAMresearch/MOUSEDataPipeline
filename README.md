@@ -12,6 +12,12 @@ Create and activate a virtual environment, then install the project in editable 
 
 This installs the runtime dependencies, the current source tree, and the `mouse-directory-processor` console entry point.
 
+If you prefer `uv`, sync the project with the development tools using:
+
+```zsh
+uv sync
+```
+
 ## linting and pre-commit
 
 Install the git hooks with:
@@ -20,10 +26,30 @@ Install the git hooks with:
 ./.venv/bin/pre-commit install
 ```
 
+If the hook fails with `No module named pre_commit`, the environment is stale. Refresh it with either:
+
+```zsh
+./.venv/bin/python -m pip install -e '.[dev]'
+```
+
+or:
+
+```zsh
+uv sync
+```
+
 Run the configured checks manually with:
 
 ```zsh
 ./.venv/bin/pre-commit run --files <changed-files>
+```
+
+If you are using `uv`, the equivalent commands are:
+
+```zsh
+uv run pre-commit run --files <changed-files>
+uv run ruff check
+uv run ruff format --check
 ```
 
 The repository now uses:

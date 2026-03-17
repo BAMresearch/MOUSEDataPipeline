@@ -71,7 +71,15 @@ def _run_mouse_logbook_cli(
         str(batch),
     ]
     logger.info("Running metadata update via mouse_logbook CLI: %s", " ".join(command))
-    result = subprocess.run(command, check=True, capture_output=True, text=True)
+    try:
+        result = subprocess.run(command, check=True, capture_output=True, text=True)
+    except subprocess.CalledProcessError as e:
+        if e.stdout and e.stdout.strip():
+            logger.error("mouse_logbook stdout for %s:\n%s", input_file, e.stdout.strip())
+        if e.stderr and e.stderr.strip():
+            logger.error("mouse_logbook stderr for %s:\n%s", input_file, e.stderr.strip())
+        logger.error("Metadata update failed for %s with command: %s", input_file, " ".join(command))
+        raise
     if result.stdout.strip():
         logger.info(result.stdout.strip())
     if result.stderr.strip():
