@@ -7,37 +7,39 @@
 3. Add a minimal but effective `pytest` test suite around the migration.
 4. Improve package structure, environment reproducibility, and runtime robustness without rewriting the whole pipeline at once.
 
+## Progress Update
+
+The following migration steps are now implemented in this repository:
+
+- `src/processstep_metadata_update.py` now prefers `mouse-logbook write-nexus-metadata ...` and only falls back to the legacy in-process metadata updater if the CLI path fails.
+- `src/directory_processor.py` no longer constructs a logbook reader eagerly at startup.
+- Logbook-reader access is now isolated in `src/logbook_support.py`.
+- Process-step modules no longer import `logbook2mouse` directly; they use a local `LogbookReaderLike | None` type instead.
+- `src/directory_processor_multibatch_nostack.sh` now exits on the first failed batch instead of printing a false success message.
+- `requirements.txt` now includes `mouse_logbook` and `pint`.
+- `src/processstep_metadata_update.py` has been simplified to a pure `mouse-logbook write-nexus-metadata ...` wrapper.
+- `src/logbook_support.py` now uses `mouse_logbook` only.
+- `logbook2mouse` has been removed from `requirements.txt`.
+
+What is still transitional:
+
+- No `pytest` suite or package metadata has been added yet.
+
 ## Current State Observations
 
-- `src/directory_processor.py` constructs `logbook2mouse.logbook_reader.Logbook2MouseReader` directly and passes it into every process step.
-- Most process steps only accept the reader in their signature. The only current consumer of reader internals in this repository is `src/processstep_metadata_update.py`.
-- `src/processstep_metadata_update.py` performs direct HDF5 writes itself through `HDF5Translator` elements. It is not isolated behind a writer abstraction.
-- The current metadata updater depends on the old object model:
-  - `entry.sampleposition`
-  - `entry.sample.density`
-  - `entry.sample.calculate_overall_properties(...)`
-  - component fields such as `volume_fraction`, `mass_fraction`, and `name`
-- `requirements.txt` still installs `logbook2mouse` from Git.
-- The entry points `src/directory_processor.py` and `src/directory_processor_multibatch_nostack.sh` call `python`, but the current shell environment does not expose the same interpreter as the project `.venv`.
+- `src/directory_processor.py` now passes `None` to process steps unless a step explicitly opts in to reader construction.
+- Most process steps only accept the reader in their signature. The only current consumer of reader internals in this repository remains `src/processstep_metadata_update.py`, and only for legacy fallback.
+- `src/processstep_metadata_update.py` is now a thin CLI wrapper around `mouse_logbook`.
+- The entry points still default to `python`, but the batch script now allows overriding the interpreter through `PYTHON_BIN`.
 - The repository currently has no `pyproject.toml`, no `pytest` setup, and no tests.
 
 ## Findings About `mouse_logbook`
 
-- The local `.venv` contains `mouse-logbook==0.1.0`.
-- In that installed version, `Logbook2MouseReader` is available via `from mouse_logbook import Logbook2MouseReader`.
-- The installed package does not currently expose a `mouse_logbook.nexuswriter` module.
-- The installed package provides a legacy-compatible reader facade, but not a full legacy-compatible nested object model.
-- Important compatibility differences observed from the installed package:
-  - new entry object uses `entry.positions`, not `entry.sampleposition`
-  - parsed sample components use `vol_frac`, `mass_frac`, and `component_name`
-  - the parsed sample model in the installed package does not provide `density` or `calculate_overall_properties(...)`
-- With the current `MOUSE_settings.yaml` data, the old `logbook2mouse` reader loads successfully, but the installed `mouse_logbook` reader fails on at least one real project sheet due to stricter validation:
-  - `2025012_Andrea_BAM3p6.xlsx: invalid Sample_Info: sampleId=1: volFrac sums to 0.300000, expected ~1.0`
-
-This means the migration is not just an import replacement. There are two separate blockers:
-
-1. parser/data compatibility with current proposal sheets
-2. metadata-updater assumptions about the old nested object model
+- The local `.venv` currently contains `mouse-logbook==0.1.2`.
+- The CLI now exposes `write-nexus-metadata`, and that command works locally on the configured dataset.
+- The installed package provides a legacy-compatible reader facade.
+- The upstream reader now normalizes volume fractions, which removed one earlier compatibility blocker.
+- With the current `MOUSE_settings.yaml` data, `mouse_logbook.Logbook2MouseReader` now loads successfully against the configured corpus.
 
 ## Migration Strategy
 
@@ -145,17 +147,11 @@ Split the current module into small units:
 
 ### Writer strategy
 
-1. If the target `mouse_logbook` revision provides the desired NeXus writer, use it behind a thin local wrapper.
-2. If not, add a repository-owned writer abstraction now and swap the backend later.
-
-That keeps the processing step stable even if the upstream writer API changes.
-
-If the new CLI remains stable, the initial integration can be extremely small:
+The initial integration has now been reduced to a very small wrapper:
 
 - call `mouse-logbook write-nexus-metadata <logbook.xlsx> <projects_dir> <output.nxs> --ymd <YYYYMMDD> --batch-num <batch>`
-- keep the current in-process writer as a temporary fallback during migration
 
-That would remove almost all direct logbook-object handling from `processstep_metadata_update.py` immediately.
+The old in-process metadata updater has been removed from the runtime path.
 
 ### Required metadata scope
 
@@ -171,27 +167,18 @@ At minimum, the rewritten step should handle:
 - sample position fields
 - sample components subtree
 
-### Derived values
-
-The current code also writes:
-
-- sample density
-- overall attenuation (`overall_mu`)
-
-Those should not depend on third-party sample-object methods anymore. Move the calculations into repository-owned functions, or make them optional with explicit warnings when the necessary inputs are unavailable.
-
 ### Robustness improvements
 
 - make writes idempotent
 - handle missing optional metadata cleanly
 - replace broad subprocess-only exception handling with actual HDF5/logbook errors
-- remove hidden assumptions about attribute names from third-party objects
+- keep the metadata update path independent from third-party in-memory object shape
 
 ### Exit Criteria
 
-- The metadata step updates a representative `.nxs` fixture correctly.
+- The metadata step updates a representative `.nxs` file correctly through the CLI writer.
 - `/entry1/sample/sampleowner` is written.
-- The step works from normalized adapter data, not directly from the third-party object graph.
+- The step no longer depends on direct access to third-party object graphs.
 
 ## Phase 5: Add `pytest` Coverage
 
@@ -209,7 +196,7 @@ Start with focused tests that pin the migration behavior.
 
 1. `processstep_metadata_update.run(...)` writing into a temp NeXus file
 2. `directory_processor.py` using the adapter and selected steps
-3. regression test for the strict parser failure case
+3. reader initialization against representative proposal fixtures
 
 ### Fixture strategy
 
@@ -243,11 +230,10 @@ These are follow-on maintainability tasks that become easier once the adapter an
    - document the interpreter/venv expectation
 2. Introduce the adapter without changing behavior
    - keep `logbook2mouse` behind the adapter first
-3. Add failing tests for `mouse_logbook` compatibility gaps
-4. Make `mouse_logbook` read the current data corpus
-5. Rewrite `processstep_metadata_update.py` around normalized data and a writer abstraction
-6. Switch the adapter backend from `logbook2mouse` to `mouse_logbook`
-7. Remove the `logbook2mouse` dependency
+3. Verify `mouse_logbook` against the current data corpus
+4. Rewrite `processstep_metadata_update.py` around the CLI writer
+5. Remove the `logbook2mouse` dependency
+6. Add tests around the stabilized path
 
 ## Definition Of Done For This Migration
 
@@ -262,10 +248,13 @@ The migration can be considered complete when all of the following are true:
 
 ## Immediate Next Step
 
-The highest-value first implementation step is:
+The highest-value next implementation step is:
 
-1. add the environment/test scaffolding
-2. introduce the local adapter while still using `logbook2mouse`
-3. write a regression test that captures the current `mouse_logbook` parser failure
+1. add `pytest` coverage for:
+   - CLI-first metadata updates
+   - `DirectoryProcessor` startup without eager reader construction
+   - reader initialization against small representative fixtures
+2. add a `pyproject.toml` and split runtime vs development dependencies
+3. tighten CLI/runtime documentation around `.venv` and `PYTHON_BIN`
 
-That gives a safe base for the actual dependency swap and the metadata-writer rewrite.
+The dependency swap is complete in code. The remaining work is now testing, packaging, and cleanup.
