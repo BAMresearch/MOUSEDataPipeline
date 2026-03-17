@@ -1,10 +1,11 @@
-from pathlib import Path
 import logging
 import shutil
 import subprocess
 import sys
+from pathlib import Path
 
 import h5py
+
 from defaults_carrier import DefaultsCarrier
 from logbook_support import LogbookReaderLike
 from YMD_class import YMD, extract_metadata_from_path

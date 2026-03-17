@@ -22,7 +22,9 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
+    "pre-commit",
     "pytest",
+    "ruff",
 ]
 
 [project.scripts]
@@ -60,3 +62,13 @@ py-modules = [
     "utilities",
     "watcher",
 ]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/conftest.py" = ["E402"]

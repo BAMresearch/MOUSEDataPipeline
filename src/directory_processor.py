@@ -1,10 +1,12 @@
+import concurrent.futures
 import importlib
 import logging
 from pathlib import Path
 from time import perf_counter
-from typing import Optional, Tuple, List
+from typing import List, Optional, Tuple
+
 import attrs
-import concurrent.futures
+
 from defaults_carrier import DefaultsCarrier, load_config_from_yaml
 from logbook_support import LogbookReaderLike, build_logbook_reader
 from YMD_class import YMD, extract_metadata_from_path
@@ -15,6 +17,7 @@ class DirectoryProcessor:
     """
     A class to manage and execute directory processing tasks using modular steps.
     """
+
     defaults: DefaultsCarrier = attrs.field(validator=attrs.validators.instance_of(DefaultsCarrier))
     logbook_reader: LogbookReaderLike | None = attrs.field(init=False, default=None)
     logger: logging.Logger = attrs.field(init=False, default=None)
@@ -48,7 +51,7 @@ class DirectoryProcessor:
         single_dir: Optional[Path] = None,
         ymd: Optional[str] = None,
         batch: Optional[int] = None,
-        repetition: Optional[int] = None
+        repetition: Optional[int] = None,
     ):
         """
         Processes a single repetition directory through a sequence of modular steps.
@@ -84,16 +87,16 @@ class DirectoryProcessor:
             step_started_at = perf_counter()
             step_module = importlib.import_module(step_name)
             if not getattr(step_module, "can_process_repetitions_in_parallel", False):
-                logging.info(f'{step_module} cannot process repetitions in parallel.')
+                logging.info(f"{step_module} cannot process repetitions in parallel.")
                 # Run this step sequentially
                 for directory in directories:
                     self._run_processing_step(step_name, directory, ymd, batch, None)
             elif parallel:
-                logging.info(f'using {step_module} to process repetitions in parallel.')
+                logging.info(f"using {step_module} to process repetitions in parallel.")
                 # Run this step in parallel
                 self._run_steps_in_parallel(step_name, directories, ymd, batch)
             else:
-                logging.info(f'{step_module} can process repetitions in parallel, but not requested.')
+                logging.info(f"{step_module} can process repetitions in parallel, but not requested.")
                 for directory in directories:
                     self._run_processing_step(step_name, directory, ymd, batch, None)
             self._log_profile(
@@ -135,11 +138,7 @@ class DirectoryProcessor:
         return list(base_dir.glob(f"{ymd}_{batch}_*/"))
 
     def _resolve_directory(
-        self,
-        single_dir: Optional[Path],
-        ymd: Optional[str],
-        batch: Optional[int],
-        repetition: Optional[int]
+        self, single_dir: Optional[Path], ymd: Optional[str], batch: Optional[int], repetition: Optional[int]
     ) -> Tuple[Path, YMD, int, int]:
         """
         Resolves and validates the input arguments to determine the directory path and metadata.
@@ -214,38 +213,33 @@ def main():
     import argparse
 
     parser = argparse.ArgumentParser(description="Process directories using DirectoryProcessor.")
-    parser.add_argument('--config', type=str, required=True, help="Path to the configuration yaml file (contains paths).")
-    parser.add_argument('--single_dir', type=str, help="Path to a single repetition directory to process.")
-    parser.add_argument('--ymd', type=str, help="YMD string (if not using single_dir).")
-    parser.add_argument('--batch', type=int, help="Batch number (if not using single_dir).")
-    parser.add_argument('--repetition', type=int, help="Repetition number (if not using single_dir).")
-    parser.add_argument('--steps', type=str, nargs='+', help="List of processing step module names.", required=True)
-    parser.add_argument('--parallel', action='store_true', help="Enable parallel processing of repetitions.")
+    parser.add_argument(
+        "--config", type=str, required=True, help="Path to the configuration yaml file (contains paths)."
+    )
+    parser.add_argument("--single_dir", type=str, help="Path to a single repetition directory to process.")
+    parser.add_argument("--ymd", type=str, help="YMD string (if not using single_dir).")
+    parser.add_argument("--batch", type=int, help="Batch number (if not using single_dir).")
+    parser.add_argument("--repetition", type=int, help="Repetition number (if not using single_dir).")
+    parser.add_argument("--steps", type=str, nargs="+", help="List of processing step module names.", required=True)
+    parser.add_argument("--parallel", action="store_true", help="Enable parallel processing of repetitions.")
 
     args = parser.parse_args()
 
     defaults = DefaultsCarrier(**load_config_from_yaml(args.config))
-    processor = DirectoryProcessor(
-        defaults=defaults,
-        steps=args.steps
-    )
+    processor = DirectoryProcessor(defaults=defaults, steps=args.steps)
 
     if args.single_dir is not None or args.repetition is not None:
         processor.process_directory(
             single_dir=Path(args.single_dir) if args.single_dir else None,
             ymd=args.ymd,
             batch=args.batch,
-            repetition=args.repetition
-            )
+            repetition=args.repetition,
+        )
     else:
         if args.ymd is None or args.batch is None:
             parser.error("Processing all repetitions requires YMD and batch.")
-        processor.process_batch(
-            ymd=args.ymd,
-            batch=args.batch,
-            parallel=args.parallel
-            )
+        processor.process_batch(ymd=args.ymd, batch=args.batch, parallel=args.parallel)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

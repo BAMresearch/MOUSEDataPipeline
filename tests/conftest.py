@@ -8,14 +8,12 @@ import h5py
 import pandas as pd
 import pytest
 
-
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 from defaults_carrier import DefaultsCarrier
-
 
 EXAMPLE_MOUSE_LOGBOOK_DATA_DIR = ROOT.parent / "mouse_logbook" / "tests" / "data"
 

@@ -30,6 +30,7 @@ The following migration steps are now implemented in this repository:
 - `DirectoryProcessor` and `YMD_class` now use explicit exceptions for core path/argument validation instead of runtime `assert` statements.
 - The `repetition=0` orchestration path now works correctly instead of being rejected by truthiness checks.
 - `utilities.py`, `processstep_thickness_from_absorption.py`, and `processstep_make_beam_mask.py` now use explicit validation exceptions instead of runtime `assert` statements in their core guard rails.
+- `ruff`, `pre-commit`, and a repo-level `.pre-commit-config.yaml` have been added for incremental linting and formatting on touched files.
 - The current local test suite passes: 20 tests.
 
 What is still transitional:
@@ -81,6 +82,7 @@ Partially complete.
 - Editable installation works with `./.venv/bin/python -m pip install -e '.[dev]' --no-deps`.
 - `MOUSE_settings.yaml` now documents `profile_steps`.
 - `README.md` now documents editable installation, the `mouse-directory-processor` entry point, and `PYTHON_BIN` for the shell wrapper.
+- `README.md` now also documents `pre-commit` setup and the incremental lint/format workflow.
 - `pytest` tests now cover:
   - metadata updates via the `mouse-logbook` CLI writer path
   - metadata CLI failure propagation
@@ -96,6 +98,15 @@ Partially complete.
   - cleanup of intermediate step-1 output files
   - explicit validation failures in `processstep_thickness_from_absorption` and `processstep_make_beam_mask`
 - The remaining packaging gap is full fresh-environment validation including dependency resolution from scratch.
+
+### Linting Status
+
+- `ruff` is configured in `pyproject.toml` with an intentionally small initial rule set:
+  - syntax/correctness-focused linting
+  - unused imports/names
+  - import sorting
+- `ruff format` is configured as the initial style enforcer.
+- The current lint configuration is meant for incremental adoption on changed files rather than an immediate full-repo cleanup.
 
 ## Phase 2: Expand Test Coverage
 
@@ -137,6 +148,7 @@ These are maintainability improvements that should now be done against the migra
 3. Remove any remaining `print(...)` debugging from runtime paths.
 4. Consider a small step registry instead of raw `importlib.import_module(...)` strings once the pipeline behavior is better covered by tests.
 5. Keep subprocess-based step wrappers simple and explicit unless a direct-library path clearly improves both performance and maintainability.
+6. Gradually widen the `ruff` rule set once the existing touched-file workflow is stable.
 
 ## Phase 4: Performance Investigation
 
@@ -177,7 +189,8 @@ The highest-value next implementation step is:
 
 1. expand `pytest` coverage to selected real processing steps with small-file smoke tests
 2. continue replacing runtime `assert` statements with explicit validation errors in the remaining utility, beam-analysis, and stacking modules
-3. collect and review real profiling output from representative batches
-4. validate a clean install path with full dependency resolution in a fresh environment
+3. start using `pre-commit` on touched files and fix the first round of `ruff` findings in the active process-step modules
+4. collect and review real profiling output from representative batches
+5. validate a clean install path with full dependency resolution in a fresh environment
 
 The dependency swap is complete in code. The remaining work is now testing, packaging, and cleanup.

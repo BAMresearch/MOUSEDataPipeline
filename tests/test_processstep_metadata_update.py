@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from pathlib import Path
 import subprocess
+from pathlib import Path
 
 import h5py
 import pytest
@@ -49,7 +49,10 @@ def test_metadata_update_cli_writer_updates_nexus_file_from_example_mouse_logboo
         assert "/entry1/sample/name" in h5f
         assert _read_scalar_string(h5f["/entry1/sample/name"]) == "Vacuum"
         assert "/entry1/processing_required_metadata/procpipeline" in h5f
-        assert _read_scalar_string(h5f["/entry1/processing_required_metadata/procpipeline"]) == "20251010_standard_logq.nxs"
+        assert (
+            _read_scalar_string(h5f["/entry1/processing_required_metadata/procpipeline"])
+            == "20251010_standard_logq.nxs"
+        )
 
 
 def test_metadata_update_cli_writer_failure_propagates(mini_dataset, monkeypatch):

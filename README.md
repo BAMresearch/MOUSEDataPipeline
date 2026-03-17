@@ -12,6 +12,28 @@ Create and activate a virtual environment, then install the project in editable 
 
 This installs the runtime dependencies, the current source tree, and the `mouse-directory-processor` console entry point.
 
+## linting and pre-commit
+
+Install the git hooks with:
+
+```zsh
+./.venv/bin/pre-commit install
+```
+
+Run the configured checks manually with:
+
+```zsh
+./.venv/bin/pre-commit run --files <changed-files>
+```
+
+The repository now uses:
+
+- `ruff check` for basic linting and import sorting
+- `ruff format` for Python formatting
+- standard `pre-commit-hooks` for YAML validity, trailing whitespace, and merge-conflict markers
+
+The initial `ruff` rollout is intentionally narrow and works best as an incremental policy on touched files. Running `pre-commit run --all-files` is still a larger cleanup task for this older codebase.
+
 # prerequisites and assumptions
 
 ## Nomenclature
@@ -49,7 +71,7 @@ The data is organized under a predefined directory structure to ensure consisten
     │                       └─── im_craw.nxs
     │               └─── 20250101_[batch]_[repetition]
     │               └─── ...
-    │               └─── autoproc  # (processed datafiles)    
+    │               └─── autoproc  # (processed datafiles)
 ```
 
 Some flexibility is possible, there is a MOUSE_settings.yaml file that contains the paths to given sections in the tree. These can be adapted to point at the bits in your structure
@@ -59,7 +81,7 @@ The configuration file also supports:
 - `profile_steps: true` to emit lightweight timing logs per step and per batch
 - `logging_level: INFO` to make the profiling output visible during runs
 
-# usage example:  
+# usage example:
 
 To process directories using specific configurations and steps, execute the following commands in your terminal:
 
@@ -73,7 +95,7 @@ Alternatively, specify measurement details directly:
 ./.venv/bin/mouse-directory-processor --config MOUSE_settings.yaml --ymd 20250101 --batch 21 --repetition 22 --steps processstep_translator_step_1 processstep_translator_step_2 processstep_beamanalysis
 ```
 
-If you want to do all currently ready steps for all repetitions in a batch, run the following: 
+If you want to do all currently ready steps for all repetitions in a batch, run the following:
 ```zsh
 ./.venv/bin/mouse-directory-processor --config MOUSE_settings.yaml \
 --ymd 20250101 --batch 21 --parallel --steps \
@@ -94,7 +116,7 @@ The shell wrappers in `src/` still work. If you want them to use a specific inte
 PYTHON_BIN=./.venv/bin/python ./src/directory_processor_multibatch_nostack.sh 20260311 1 1
 ```
 
-# top-level methods: 
+# top-level methods:
 
 ## 1. `directory_processor`
   - Processes all data for a specified measurement date (YYYYMMDD), batch, and repetition, or by a given directory path.
