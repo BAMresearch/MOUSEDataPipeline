@@ -1,6 +1,7 @@
 import importlib
 import logging
 from pathlib import Path
+from time import perf_counter
 from typing import Optional, Tuple, List
 import attrs
 import concurrent.futures
@@ -24,17 +25,22 @@ class DirectoryProcessor:
         Post-initialization setup.
         """
         self.logger = self.defaults.logger
-        # set logger level by default to warning:
-        self.logger.setLevel(logging.WARNING)
+        self.logger.setLevel(self.defaults.logging_level.upper())
         self.logger.debug(f"Initializing {self.__class__.__name__}...")
+
+    def _log_profile(self, message: str, *args):
+        if self.defaults.profile_steps:
+            self.logger.info("PROFILE " + message, *args)
 
     def _get_logbook_reader(self) -> LogbookReaderLike:
         if self.logbook_reader is None:
+            started_at = perf_counter()
             self.logbook_reader = build_logbook_reader(
                 self.defaults.logbook_file,
                 self.defaults.projects_dir,
                 logger=self.logger,
             )
+            self._log_profile("logbook_reader_init elapsed=%.3fs", perf_counter() - started_at)
         return self.logbook_reader
 
     def process_directory(
@@ -47,6 +53,7 @@ class DirectoryProcessor:
         """
         Processes a single repetition directory through a sequence of modular steps.
         """
+        process_started_at = perf_counter()
         try:
             single_dir, ymd, batch, repetition = self._resolve_directory(
                 single_dir=single_dir, ymd=ymd, batch=batch, repetition=repetition
@@ -58,16 +65,23 @@ class DirectoryProcessor:
                 self._run_processing_step(step_name, single_dir, ymd, batch, repetition)
 
             self.logger.info(f"Completed processing for directory: {single_dir}, with steps: {self.steps}")
+            self._log_profile(
+                "process_directory dir=%s elapsed=%.3fs",
+                single_dir,
+                perf_counter() - process_started_at,
+            )
 
         except Exception as e:
             self.logger.error(f"Error processing directory: {single_dir}. Exception: {e}")
             raise
 
     def process_batch(self, ymd: str, batch: int, parallel: bool = False):
+        batch_started_at = perf_counter()
         ymd = YMD(ymd)
         directories = self._get_all_repetitions_directories(ymd, batch)
 
         for step_name in self.steps:
+            step_started_at = perf_counter()
             step_module = importlib.import_module(step_name)
             if not getattr(step_module, "can_process_repetitions_in_parallel", False):
                 logging.info(f'{step_module} cannot process repetitions in parallel.')
@@ -82,9 +96,23 @@ class DirectoryProcessor:
                 logging.info(f'{step_module} can process repetitions in parallel, but not requested.')
                 for directory in directories:
                     self._run_processing_step(step_name, directory, ymd, batch, None)
+            self._log_profile(
+                "batch_step step=%s dirs=%d parallel=%s elapsed=%.3fs",
+                step_name,
+                len(directories),
+                parallel and getattr(step_module, "can_process_repetitions_in_parallel", False),
+                perf_counter() - step_started_at,
+            )
+        self._log_profile(
+            "process_batch ymd=%s batch=%s dirs=%d elapsed=%.3fs",
+            ymd,
+            batch,
+            len(directories),
+            perf_counter() - batch_started_at,
+        )
 
     def _run_steps_in_parallel(self, step_name: str, directories: List[Path], ymd: YMD, batch: int):
-        # ('running in parallel...')
+        parallel_started_at = perf_counter()
         with concurrent.futures.ThreadPoolExecutor() as executor:
             futures = [
                 executor.submit(self._run_processing_step, step_name, directory, ymd, batch, None)
@@ -92,6 +120,12 @@ class DirectoryProcessor:
             ]
             for future in concurrent.futures.as_completed(futures):
                 future.result()
+        self._log_profile(
+            "parallel_step step=%s dirs=%d elapsed=%.3fs",
+            step_name,
+            len(directories),
+            perf_counter() - parallel_started_at,
+        )
 
     def _get_all_repetitions_directories(self, ymd: YMD, batch: int) -> List[Path]:
         """
@@ -133,15 +167,36 @@ class DirectoryProcessor:
         """
         Dynamically loads and runs a processing step module with logging.
         """
+        step_started_at = perf_counter()
         try:
             module = importlib.import_module(step_name)
             logbook_reader = self._get_logbook_reader() if getattr(module, "requires_logbook_reader", False) else None
             if hasattr(module, "can_run") and hasattr(module, "run"):
-                if module.can_run(dir_path, self.defaults, logbook_reader, self.logger):
+                can_run_started_at = perf_counter()
+                should_run = module.can_run(dir_path, self.defaults, logbook_reader, self.logger)
+                can_run_elapsed = perf_counter() - can_run_started_at
+                if should_run:
                     self.logger.info(f"Running step: {step_name}")
+                    run_started_at = perf_counter()
                     module.run(dir_path, self.defaults, logbook_reader, self.logger)
+                    run_elapsed = perf_counter() - run_started_at
+                    self._log_profile(
+                        "step=%s dir=%s can_run=%.3fs run=%.3fs total=%.3fs",
+                        step_name,
+                        dir_path,
+                        can_run_elapsed,
+                        run_elapsed,
+                        perf_counter() - step_started_at,
+                    )
                 else:
                     self.logger.info(f"Step skipped: {step_name}")
+                    self._log_profile(
+                        "step=%s dir=%s skipped can_run=%.3fs total=%.3fs",
+                        step_name,
+                        dir_path,
+                        can_run_elapsed,
+                        perf_counter() - step_started_at,
+                    )
             else:
                 self.logger.error(f"Module {step_name} must define 'can_run' and 'run' functions.")
         except Exception as e:

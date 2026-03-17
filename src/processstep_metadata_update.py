@@ -4,6 +4,7 @@ import shutil
 import subprocess
 import sys
 
+import h5py
 from defaults_carrier import DefaultsCarrier
 from logbook_support import LogbookReaderLike
 from YMD_class import YMD, extract_metadata_from_path
@@ -76,6 +77,25 @@ def _run_mouse_logbook_cli(
         logger.info(result.stderr.strip())
 
 
+def _ensure_sampleowner_compatibility(output_file: Path, logger: logging.Logger) -> None:
+    with h5py.File(output_file, "a") as h5f:
+        if "/entry1/sample/sampleowner" in h5f:
+            return
+        if "/entry1/sample/owner" not in h5f:
+            logger.warning("mouse_logbook did not write /entry1/sample/owner in %s", output_file)
+            return
+
+        owner_dataset = h5f["/entry1/sample/owner"]
+        owner_value = owner_dataset[()]
+        sampleowner_dataset = h5f.require_dataset(
+            "/entry1/sample/sampleowner",
+            shape=owner_dataset.shape,
+            dtype=owner_dataset.dtype,
+        )
+        sampleowner_dataset[...] = owner_value
+        sampleowner_dataset.attrs["note"] = "Compatibility alias copied from /entry1/sample/owner."
+
+
 def run(
     dir_path: Path,
     defaults: DefaultsCarrier,
@@ -95,4 +115,5 @@ def run(
         defaults=defaults,
         logger=logger,
     )
+    _ensure_sampleowner_compatibility(input_file, logger)
     logger.info(f"Completed metadata update via mouse_logbook CLI for {input_file}")

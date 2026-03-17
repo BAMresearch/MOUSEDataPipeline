@@ -58,6 +58,7 @@ class DefaultsCarrier:
     stacker_config_file: Optional[Path] = attrs.field(default=None, converter=convert_to_path_or_none, validator=[if_not_none_is_path_and_exists])
 
     logging_level: str = attrs.field(default='INFO', converter=str)
+    profile_steps: bool = attrs.field(default=True)
     log_to_file: bool = attrs.field(default=False)
     log_file: Optional[Path] = attrs.field(default=None, converter=convert_to_path_or_none)
     logger: logging.Logger = attrs.field(init=False)
@@ -83,6 +84,7 @@ class DefaultsCarrier:
         Configure logging for the carrier.
         """
         self.logger = logging.getLogger('DefaultsCarrier')
+        self.logger.handlers.clear()
         self.logger.setLevel(self.logging_level.upper())
 
         if self.log_to_file:
@@ -120,6 +122,7 @@ def create_defaults_carrier_from_config(config_file: Optional[str] = None) -> De
         stacker_config_file=config.get('stacker_config_file', None),
         projects_dir=config.get('projects_dir', None),
         logging_level=config.get('logging_level', 'INFO'),
+        profile_steps=config.get('profile_steps', True),
         log_to_file=config.get('log_to_file', False),
         log_file=config.get('log_file', None)
     )
