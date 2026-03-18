@@ -107,6 +107,7 @@ The configuration file also supports:
 - `profile_steps: true` to emit lightweight timing logs per step and per batch
 - `logging_level: INFO` to make the profiling output visible during runs
 - `log_per_datafile: true` to write a `MOUSE_<ymd>_<batch>_<repetition>.processing.log` file next to each repetition output
+- `parallel_workers: 4` to cap the repetition thread-pool size for disk-heavy parallel steps; leave it unset to use Python's default
 
 # CLI overview
 
@@ -157,6 +158,15 @@ If you want to process a full batch with the standard preprocessing preset, run:
 ```zsh
 ./.venv/bin/mouse-directory-processor --config MOUSE_settings.yaml \
   --ymd 20250101 --batch 21 --parallel \
+  --step-preset preprocess
+```
+
+If the storage backend is the bottleneck, you can also tune the worker count directly:
+
+```zsh
+./.venv/bin/mouse-directory-processor --config MOUSE_settings.yaml \
+  --ymd 20250101 --batch 21 --parallel \
+  --parallel-workers 4 \
   --step-preset preprocess
 ```
 

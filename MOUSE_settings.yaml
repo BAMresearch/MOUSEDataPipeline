@@ -19,3 +19,7 @@ profile_steps: true
 
 # Write a small per-repetition log file next to each generated MOUSE_*.nxs file.
 log_per_datafile: true
+
+# Optional override for the repetition thread-pool size during parallel batch processing.
+# Leave unset to use Python's default ThreadPoolExecutor worker count.
+parallel_workers: null

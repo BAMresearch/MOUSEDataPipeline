@@ -24,6 +24,7 @@ The following migration steps are now implemented in this repository:
 - `src/directory_processor.py` now emits lightweight per-step timing logs when profiling is enabled.
 - `src/directory_processor.py` now also creates per-repetition log files alongside generated `MOUSE_*.nxs` outputs when `log_per_datafile` is enabled.
 - `src/directory_processor.py` now exposes a clearer CLI with built-in step presets and discovery flags for steps and presets.
+- `src/directory_processor.py` and `DefaultsCarrier` now support a `parallel_workers` override to tune repetition-level thread-pool size for disk-heavy batch runs.
 - The shell wrappers in `src/` now call the installed `mouse-directory-processor` command instead of invoking `src/directory_processor.py` directly.
 - `processstep_translator_step_1.py`, `processstep_translator_step_2.py`, and `processstep_metadata_update.py` now skip expensive reruns when their outputs are already up to date.
 - `pytest.ini`, `requirements-dev.txt`, and a first `tests/` suite have been added.
@@ -31,6 +32,7 @@ The following migration steps are now implemented in this repository:
 - `requirements-dev.txt` now installs the project in editable mode through `-e .[dev]`.
 - `MOUSE_settings.yaml` now documents the `profile_steps` toggle.
 - `MOUSE_settings.yaml` and `README.md` now document `log_per_datafile`.
+- `MOUSE_settings.yaml`, the CLI, and `README.md` now document `parallel_workers` for first-run performance tuning.
 - `README.md` now documents the preset-based CLI workflow and the discovery commands for steps and presets.
 - `README.md` now also makes the installed `mouse-directory-processor` console command the primary user-facing entry point.
 - `tests/` now also covers realistic Excel fixtures from `mouse_logbook/tests/data`.
@@ -46,7 +48,7 @@ The following migration steps are now implemented in this repository:
 - `periodictable` and `xraydb` are now declared directly as runtime dependencies because the `mouse_logbook` metadata writer requires them during chemistry and X-ray validation.
 - The removed obsolete modules are no longer referenced from `pyproject.toml`.
 - Fresh-environment validation has now been exercised successfully on Python 3.14 in both the runtime and `.[dev]` environments.
-- The current local test suite passes: 38 tests.
+- The current local test suite passes: 40 tests.
 
 ## Current State Observations
 
@@ -54,6 +56,7 @@ The following migration steps are now implemented in this repository:
 - Most process steps only accept the reader in their signature, and none of the active runtime steps currently dereference it directly.
 - `src/processstep_metadata_update.py` remains a thin CLI wrapper around `mouse_logbook`.
 - Expensive subprocess-heavy steps now avoid rerunning when their outputs are newer than their inputs and configuration sources.
+- Batch-level parallelism can now be capped explicitly when storage contention makes the default thread count too aggressive.
 - The entry points still default to `python`, but the batch script now allows overriding the interpreter through `PYTHON_BIN`.
 - The repository now has `pytest` scaffolding, an editable-install path via `pyproject.toml`, updated README usage examples, and a small integration-oriented test suite.
 
@@ -118,6 +121,7 @@ Mostly complete.
   - explicit logger-path usage in the standalone stacker script
   - CLI step-presets, step discovery, and preset discovery
   - rerun-skipping behavior for translator step 1, translator step 2, and metadata update
+  - configurable parallel worker limits in both config and CLI
 - The remaining packaging gap is mainly representative clean-room usage validation beyond installation itself.
 
 ### Linting Status
@@ -182,6 +186,7 @@ The pipeline has now been profiled enough to identify the first hot spots. The i
 2. Collect step-level timings and identify the slowest stages.
    - Current measurements point to translator step 2 at roughly 10 s per repetition and metadata update at roughly 1.5 s per repetition.
    - Cheap rerun-avoidance is now in place, so the remaining hot path is mostly first-run work rather than repeated development reruns.
+   - `parallel_workers` is now available as a low-effort tuning knob when first-run throughput is limited by disk contention rather than CPU.
 3. Separate likely costs:
    - HDF5 read/write I/O
    - translator template-copy overhead and HDF5 I/O
@@ -214,6 +219,6 @@ The highest-value next implementation step is:
 2. keep using `pre-commit` on touched files and gradually widen `ruff` coverage once the touched-file workflow stays stable
 3. collect and review real profiling output from representative first-run batches
 4. consider one or two small usability improvements for the CLI output, such as a `--show-config` view or friendlier preset descriptions
-5. if first-run performance still matters, evaluate whether thread-pool sizing should become a user-tunable config option for disk-heavy steps
+5. if first-run performance still matters after tuning `parallel_workers`, move the deeper optimization work into `HDF5Translator` or more targeted I/O reductions
 
 The dependency swap is complete in code. The remaining work is now testing, packaging, and cleanup.

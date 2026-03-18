@@ -162,6 +162,53 @@ def test_directory_processor_propagates_parallel_step_errors(mini_dataset, monke
         processor.process_batch(mini_dataset.ymd, mini_dataset.batch_num, parallel=True)
 
 
+def test_directory_processor_uses_configured_parallel_workers(mini_dataset, monkeypatch):
+    processor = DirectoryProcessor(defaults=mini_dataset.defaults, steps=["fake_step"])
+    processor.defaults.parallel_workers = 3
+    submitted_calls: list[tuple[str, Path]] = []
+    captured: dict[str, int | None] = {}
+
+    class FakeExecutor:
+        def __init__(self, max_workers=None):
+            captured["max_workers"] = max_workers
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def submit(self, fn, step_name, directory, ymd, batch, repetition):
+            fn(step_name, directory, ymd, batch, repetition)
+            future = directory_processor.concurrent.futures.Future()
+            future.set_result(None)
+            return future
+
+    monkeypatch.setattr(directory_processor.concurrent.futures, "ThreadPoolExecutor", FakeExecutor)
+    monkeypatch.setattr(directory_processor.concurrent.futures, "as_completed", lambda futures: futures)
+    monkeypatch.setattr(
+        DirectoryProcessor,
+        "_run_processing_step",
+        lambda self, step_name, directory, ymd, batch, repetition: submitted_calls.append((step_name, directory)),
+    )
+
+    second_dir = mini_dataset.repetition_dir.parent / f"{mini_dataset.ymd}_{mini_dataset.batch_num}_1"
+    second_dir.mkdir(parents=True, exist_ok=True)
+
+    processor._run_steps_in_parallel(
+        "fake_step",
+        [mini_dataset.repetition_dir, second_dir],
+        YMD(mini_dataset.ymd),
+        mini_dataset.batch_num,
+    )
+
+    assert captured["max_workers"] == 3
+    assert submitted_calls == [
+        ("fake_step", mini_dataset.repetition_dir),
+        ("fake_step", second_dir),
+    ]
+
+
 def test_directory_processor_resolve_directory_accepts_repetition_zero(mini_dataset):
     processor = DirectoryProcessor(defaults=mini_dataset.defaults, steps=[])
 
@@ -274,3 +321,46 @@ def test_main_uses_step_preset_for_batch(mini_dataset, monkeypatch):
         "batch": mini_dataset.batch_num,
         "parallel": True,
     }
+
+
+def test_main_overrides_parallel_workers(mini_dataset, monkeypatch):
+    recorded: dict[str, object] = {}
+
+    monkeypatch.setattr(
+        directory_processor,
+        "load_config_from_yaml",
+        lambda path: {
+            "vsi_root": str(mini_dataset.defaults.vsi_root),
+            "post_translation_dir": str(mini_dataset.defaults.post_translation_dir),
+            "translator_template_dir": str(mini_dataset.defaults.translator_template_dir),
+            "saxs_dir": str(mini_dataset.defaults.saxs_dir),
+            "data_dir": str(mini_dataset.defaults.data_dir),
+            "masks_dir": str(mini_dataset.defaults.masks_dir),
+            "projects_dir": str(mini_dataset.defaults.projects_dir),
+            "logbook_file": str(mini_dataset.defaults.logbook_file),
+            "stacker_config_file": str(mini_dataset.defaults.stacker_config_file),
+            "logging_level": mini_dataset.defaults.logging_level,
+        },
+    )
+
+    def fake_process_batch(self, ymd, batch, parallel):
+        recorded["parallel_workers"] = self.defaults.parallel_workers
+
+    monkeypatch.setattr(DirectoryProcessor, "process_batch", fake_process_batch)
+
+    directory_processor.main(
+        [
+            "--config",
+            "dummy.yaml",
+            "--ymd",
+            mini_dataset.ymd,
+            "--batch",
+            str(mini_dataset.batch_num),
+            "--parallel-workers",
+            "4",
+            "--step-preset",
+            "stackonly",
+        ]
+    )
+
+    assert recorded["parallel_workers"] == 4

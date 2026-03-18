@@ -77,6 +77,9 @@ class DirectoryProcessor:
         if self.defaults.profile_steps:
             self.logger.info("PROFILE " + message, *args)
 
+    def _get_parallel_workers(self) -> int | None:
+        return self.defaults.parallel_workers
+
     def _get_directory_logger(self, dir_path: Path) -> logging.Logger:
         if not self.defaults.log_per_datafile:
             return self.logger
@@ -167,7 +170,11 @@ class DirectoryProcessor:
                 for directory in directories:
                     self._run_processing_step(step_name, directory, ymd, batch, None)
             elif parallel:
-                self.logger.info(f"using {step_module} to process repetitions in parallel.")
+                self.logger.info(
+                    "%s will process repetitions in parallel with workers=%s.",
+                    step_module,
+                    self._get_parallel_workers() if self._get_parallel_workers() is not None else "default",
+                )
                 # Run this step in parallel
                 self._run_steps_in_parallel(step_name, directories, ymd, batch)
             else:
@@ -191,7 +198,8 @@ class DirectoryProcessor:
 
     def _run_steps_in_parallel(self, step_name: str, directories: List[Path], ymd: YMD, batch: int):
         parallel_started_at = perf_counter()
-        with concurrent.futures.ThreadPoolExecutor() as executor:
+        parallel_workers = self._get_parallel_workers()
+        with concurrent.futures.ThreadPoolExecutor(max_workers=parallel_workers) as executor:
             futures = [
                 executor.submit(self._run_processing_step, step_name, directory, ymd, batch, None)
                 for directory in directories
@@ -322,6 +330,11 @@ def build_arg_parser():
         help="List built-in step presets and exit.",
     )
     parser.add_argument("--parallel", action="store_true", help="Enable parallel processing of repetitions.")
+    parser.add_argument(
+        "--parallel-workers",
+        type=int,
+        help="Maximum number of worker threads for parallel repetition processing. Defaults to ThreadPoolExecutor behavior.",
+    )
     return parser
 
 
@@ -350,6 +363,10 @@ def main(argv: list[str] | None = None):
         parser.error(str(exc))
 
     defaults = DefaultsCarrier(**load_config_from_yaml(args.config))
+    if args.parallel_workers is not None:
+        if args.parallel_workers <= 0:
+            parser.error("--parallel-workers must be a positive integer.")
+        defaults.parallel_workers = args.parallel_workers
     processor = DirectoryProcessor(defaults=defaults, steps=requested_steps)
 
     if args.single_dir is not None or args.repetition is not None:

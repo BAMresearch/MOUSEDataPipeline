@@ -26,6 +26,23 @@ def convert_to_path_or_none(value):
     return Path(value) if value else None
 
 
+def convert_to_int_or_none(value):
+    """
+    Convert value to int if not None, otherwise return None.
+    """
+    return int(value) if value is not None else None
+
+
+def if_not_none_is_positive_int(instance, attribute, value):
+    """
+    Validator to ensure the value is a positive integer when provided.
+    """
+    if value is None:
+        return
+    if not isinstance(value, int) or value <= 0:
+        raise ValueError(f"{attribute.name} must be a positive integer or None.")
+
+
 # Configuration Loader
 def load_config_from_yaml(file_path: str) -> dict:
     """
@@ -74,6 +91,11 @@ class DefaultsCarrier:
     logging_level: str = attrs.field(default="INFO", converter=str)
     profile_steps: bool = attrs.field(default=True)
     log_per_datafile: bool = attrs.field(default=True)
+    parallel_workers: Optional[int] = attrs.field(
+        default=None,
+        converter=convert_to_int_or_none,
+        validator=[if_not_none_is_positive_int],
+    )
     log_to_file: bool = attrs.field(default=False)
     log_file: Optional[Path] = attrs.field(default=None, converter=convert_to_path_or_none)
     logger: logging.Logger = attrs.field(init=False)
@@ -155,6 +177,7 @@ def create_defaults_carrier_from_config(config_file: Optional[str] = None) -> De
         logging_level=config.get("logging_level", "INFO"),
         profile_steps=config.get("profile_steps", True),
         log_per_datafile=config.get("log_per_datafile", True),
+        parallel_workers=config.get("parallel_workers", None),
         log_to_file=config.get("log_to_file", False),
         log_file=config.get("log_file", None),
     )
