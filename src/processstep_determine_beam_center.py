@@ -9,7 +9,7 @@ from skimage.measure import regionprops
 
 from defaults_carrier import DefaultsCarrier
 from logbook_support import LogbookReaderLike
-from utilities import label_main_feature, prepare_eiger_image
+from utilities import get_weighted_centroid_compat, label_main_feature, prepare_eiger_image
 from YMD_class import extract_metadata_from_path
 
 # Flag indicating whether this process step can be executed in parallel on multiple repetitions
@@ -61,7 +61,7 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: LogbookReader
         labels = label_main_feature(maskedTwoDImage, logger)
         # step 4: calculate region properties
         properties = regionprops(labels, maskedTwoDImage)  # calculate region properties
-        weighted_center_of_mass = properties[0].centroid_weighted  # center of mass (weighted)
+        weighted_center_of_mass = get_weighted_centroid_compat(properties[0])  # center of mass (weighted)
 
         # Write out the beam center:
         TElements = []  # we want to add multiple elements, so I make a list

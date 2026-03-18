@@ -42,13 +42,14 @@ The following migration steps are now implemented in this repository:
 - `post_translation_operation_hdf5_stacker.py` and `processstep_calc_beam_flux_and_transmissions.py` now also use explicit validation exceptions instead of runtime `assert` statements in active runtime paths.
 - `processstep_determine_beam_center.py`, `processstep_thickness_from_absorption.py`, and `processstep_stacker.py` no longer write progress/debug information to stdout; they now use logger output instead.
 - Active `skimage` deprecation warnings have been addressed by updating beam-feature cleanup and weighted-centroid access to the current API.
+- Beam-analysis compatibility shims now support both older and newer `scikit-image` APIs for morphology cleanup and weighted-centroid access.
 - Active step execution now uses per-repetition child loggers, and the standalone `post_translation_operation_hdf5_stacker.py` script now also uses an explicit module/logger path instead of direct root-logger calls.
 - `ruff`, `pre-commit`, and a repo-level `.pre-commit-config.yaml` have been added for incremental linting and formatting on touched files.
 - `pyproject.toml` now exposes the linting tools both as a `pip` extra and as a `uv` dependency group.
 - `periodictable` and `xraydb` are now declared directly as runtime dependencies because the `mouse_logbook` metadata writer requires them during chemistry and X-ray validation.
 - The removed obsolete modules are no longer referenced from `pyproject.toml`.
 - Fresh-environment validation has now been exercised successfully on Python 3.14 in both the runtime and `.[dev]` environments.
-- The current local test suite passes: 40 tests.
+- The current local test suite passes: 43 tests.
 
 ## Current State Observations
 
@@ -122,6 +123,7 @@ Mostly complete.
   - CLI step-presets, step discovery, and preset discovery
   - rerun-skipping behavior for translator step 1, translator step 2, and metadata update
   - configurable parallel worker limits in both config and CLI
+  - compatibility behavior across older and newer `scikit-image` APIs used in beam analysis
 - The remaining packaging gap is mainly representative clean-room usage validation beyond installation itself.
 
 ### Linting Status

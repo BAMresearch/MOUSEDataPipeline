@@ -16,7 +16,7 @@ from skimage.measure import regionprops
 # from checkers import len_files_in_path, processing_possible
 from defaults_carrier import DefaultsCarrier
 from logbook_support import LogbookReaderLike
-from utilities import get_float_from_h5, label_main_feature, prepare_eiger_image
+from utilities import get_float_from_h5, get_weighted_centroid_compat, label_main_feature, prepare_eiger_image
 from YMD_class import extract_metadata_from_path
 
 # Flag indicating whether this process step can be executed in parallel on multiple repetitions
@@ -45,7 +45,7 @@ def dynamic_beam_analysis(
         the requested 2-D Gaussian coverage. - disclaimer: this method is mainly GPT code...
         """
         # 1) center and weighted moments
-        cy, cx = reg.centroid_weighted
+        cy, cx = get_weighted_centroid_compat(reg)
         mu_c = reg.weighted_moments_central
         m00 = reg.weighted_moments[0, 0]
         if m00 <= 0:
@@ -135,7 +135,7 @@ def dynamic_beam_analysis(
     properties = regionprops(beam_coverage_mask, maskedTwoDImage)  # calculate region properties
     # continue normally if beam found
     # center_of_mass = properties[0].centroid  # center of mass (unweighted by intensity)
-    weighted_center_of_mass = properties[0].centroid_weighted  # center of mass (weighted)
+    weighted_center_of_mass = get_weighted_centroid_compat(properties[0])  # center of mass (weighted)
     # get the intensity in the region of interest
     ITotal_region = float(properties[0].intensity_image.sum())
     ITotal_overall = float(maskedTwoDImage.sum())

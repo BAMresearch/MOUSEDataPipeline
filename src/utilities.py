@@ -139,6 +139,41 @@ def prepare_eiger_image(image: np.ndarray, logger: logging.Logger) -> np.ndarray
     return reduced_image
 
 
+def remove_small_objects_compat(mask: np.ndarray, cleanup_size: int) -> np.ndarray:
+    """
+    Use the current skimage morphology API when available and fall back to the
+    pre-0.26 keyword on older installations.
+    """
+    try:
+        return morphology.remove_small_objects(mask, max_size=cleanup_size - 1)
+    except TypeError as exc:
+        if "max_size" not in str(exc):
+            raise
+        return morphology.remove_small_objects(mask, min_size=cleanup_size)
+
+
+def remove_small_holes_compat(mask: np.ndarray, cleanup_size: int) -> np.ndarray:
+    """
+    Use the current skimage morphology API when available and fall back to the
+    pre-0.26 keyword on older installations.
+    """
+    try:
+        return morphology.remove_small_holes(mask, max_size=cleanup_size - 1)
+    except TypeError as exc:
+        if "max_size" not in str(exc):
+            raise
+        return morphology.remove_small_holes(mask, area_threshold=cleanup_size)
+
+
+def get_weighted_centroid_compat(region) -> tuple[float, float]:
+    """
+    Support both the old and new regionprops weighted-centroid attribute names.
+    """
+    if hasattr(region, "centroid_weighted"):
+        return region.centroid_weighted
+    return region.weighted_centroid
+
+
 def label_main_feature(maskedTwoDImage: np.ndarray, logger: logging.Logger) -> np.ndarray:
     """
     Labels the main feature in the image using connected component analysis.
@@ -159,11 +194,12 @@ def label_main_feature(maskedTwoDImage: np.ndarray, logger: logging.Logger) -> n
     # labels = measure.label(mask, connectivity=2)
     labels, num = measure.label(
         morphology.convex_hull_image(  # we expect the beam to be convex
-            morphology.remove_small_holes(  # with moly we may see small dead pixels in the beam
-                morphology.remove_small_objects(  # we don't care about isolated spikes
-                    mask, max_size=cleanup_max_size
+            remove_small_holes_compat(  # with moly we may see small dead pixels in the beam
+                remove_small_objects_compat(  # we don't care about isolated spikes
+                    mask,
+                    cleanup_size=cleanup_max_size + 1,
                 ),
-                max_size=cleanup_max_size,
+                cleanup_size=cleanup_max_size + 1,
             ),
         ),
         connectivity=1,

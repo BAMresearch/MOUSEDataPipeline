@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mousedatapipeline"
-version = "0.1.0"
+version = "0.2.0"
 description = "Preprocessing pipeline for MOUSE data before correction."
 readme = "README.md"
 requires-python = ">=3.11"
