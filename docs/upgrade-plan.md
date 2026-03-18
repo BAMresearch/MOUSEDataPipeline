@@ -20,6 +20,7 @@ The following migration steps are now implemented in this repository:
 - `src/logbook_support.py` now uses `mouse_logbook` only.
 - `logbook2mouse` has been removed from `requirements.txt`.
 - `src/processstep_metadata_update.py` now also writes `/entry1/sample/sampleowner` as a compatibility alias from the CLI-written `/entry1/sample/owner`.
+- `src/processstep_metadata_update.py` now also treats `/entry1/sample/transformations/sample_x` as required metadata so reruns do not skip files that are still missing the sample-position offset.
 - `src/processstep_translator_step_2.py` continues to shell out to `python3 -m HDF5Translator`.
 - `src/directory_processor.py` now emits lightweight per-step timing logs when profiling is enabled.
 - `src/directory_processor.py` now also creates per-repetition log files alongside generated `MOUSE_*.nxs` outputs when `log_per_datafile` is enabled.
@@ -49,7 +50,7 @@ The following migration steps are now implemented in this repository:
 - `periodictable` and `xraydb` are now declared directly as runtime dependencies because the `mouse_logbook` metadata writer requires them during chemistry and X-ray validation.
 - The removed obsolete modules are no longer referenced from `pyproject.toml`.
 - Fresh-environment validation has now been exercised successfully on Python 3.14 in both the runtime and `.[dev]` environments.
-- The current local test suite passes: 43 tests.
+- The current local test suite passes: 44 tests.
 
 ## Current State Observations
 
@@ -63,7 +64,7 @@ The following migration steps are now implemented in this repository:
 
 ## Findings About `mouse_logbook`
 
-- The local `.venv` currently contains `mouse-logbook==0.1.2`.
+- The local `mouse_logbook` dependency now targets the `0.1.3` revision that adds `sample_x` metadata export.
 - The CLI now exposes `write-nexus-metadata`, and that command works locally on the configured dataset.
 - The installed package provides a legacy-compatible reader facade.
 - The upstream reader now normalizes volume fractions, which removed one earlier compatibility blocker.
@@ -210,6 +211,7 @@ The migration can be considered complete when all of the following are true:
 - the configured project/logbook corpus is readable through `mouse_logbook`
 - metadata updates are written through the new writer path or a stable wrapper around it
 - `/entry1/sample/sampleowner` is present in updated measurement files
+- `/entry1/sample/transformations/sample_x` is present in updated measurement files when available from the logbook entry
 - `pytest` covers the reader adapter and metadata update behavior
 - the documented CLI path works from a fresh environment
 

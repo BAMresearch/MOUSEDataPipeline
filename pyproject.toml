@@ -19,7 +19,7 @@ dependencies = [
     "xraydb",
     "scikit-image",
     "HDF5Translator @ git+https://github.com/BAMresearch/HDF5Translator.git",
-    "mouse-logbook @ git+https://github.com/BAMresearch/mouse_logbook.git",
+    "mouse-logbook @ git+https://github.com/BAMresearch/mouse_logbook.git@1a401d1a74f84cd7a3a17f28a773212a7561fa46",
 ]
 
 [project.optional-dependencies]

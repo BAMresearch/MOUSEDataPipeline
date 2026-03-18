@@ -8,4 +8,4 @@ periodictable
 PyYAML
 xraydb
 git+https://github.com/BAMresearch/HDF5Translator.git
-git+https://github.com/BAMresearch/mouse_logbook.git
+git+https://github.com/BAMresearch/mouse_logbook.git@1a401d1a74f84cd7a3a17f28a773212a7561fa46

@@ -21,6 +21,7 @@ can_process_repetitions_in_parallel = True
 
 REQUIRED_METADATA_PATHS = (
     "/entry1/sample/sampleowner",
+    "/entry1/sample/transformations/sample_x",
     "/entry1/proposal/proposalid",
     "/entry1/processing_required_metadata/procpipeline",
 )

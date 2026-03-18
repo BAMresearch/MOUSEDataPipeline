@@ -28,6 +28,8 @@ def test_metadata_update_cli_writer_updates_nexus_file(mini_dataset):
     with h5py.File(mini_dataset.output_file, "r") as h5f:
         assert "/entry1/sample/sampleowner" in h5f
         assert _read_scalar_string(h5f["/entry1/sample/sampleowner"]) == "Project Owner"
+        assert "/entry1/sample/transformations/sample_x" in h5f
+        assert h5f["/entry1/sample/transformations/sample_x"][()] == pytest.approx(1.5)
         assert "/entry1/proposal/proposalid" in h5f
         assert _read_scalar_string(h5f["/entry1/proposal/proposalid"]) == "2026001"
         assert "/entry1/processing_required_metadata/procpipeline" in h5f
@@ -89,6 +91,11 @@ def test_metadata_update_can_run_skips_when_metadata_is_up_to_date(mini_dataset)
             dtype=h5py.string_dtype(encoding="utf-8"),
         )[...] = "Project Owner"
         h5f.require_dataset(
+            "/entry1/sample/transformations/sample_x",
+            shape=(),
+            dtype="f8",
+        )[...] = 1.5
+        h5f.require_dataset(
             "/entry1/proposal/proposalid",
             shape=(),
             dtype=h5py.string_dtype(encoding="utf-8"),
@@ -111,4 +118,37 @@ def test_metadata_update_can_run_skips_when_metadata_is_up_to_date(mini_dataset)
             logger=mini_dataset.defaults.logger,
         )
         is False
+    )
+
+
+def test_metadata_update_can_run_requires_sample_x(mini_dataset):
+    with h5py.File(mini_dataset.output_file, "a") as h5f:
+        h5f.require_dataset(
+            "/entry1/sample/sampleowner",
+            shape=(),
+            dtype=h5py.string_dtype(encoding="utf-8"),
+        )[...] = "Project Owner"
+        h5f.require_dataset(
+            "/entry1/proposal/proposalid",
+            shape=(),
+            dtype=h5py.string_dtype(encoding="utf-8"),
+        )[...] = "2026001"
+        h5f.require_dataset(
+            "/entry1/processing_required_metadata/procpipeline",
+            shape=(),
+            dtype=h5py.string_dtype(encoding="utf-8"),
+        )[...] = "test-pipeline"
+
+    os.utime(mini_dataset.logbook_file, (100, 100))
+    os.utime(mini_dataset.project_file, (100, 100))
+    os.utime(mini_dataset.output_file, (200, 200))
+
+    assert (
+        processstep_metadata_update.can_run(
+            mini_dataset.repetition_dir,
+            mini_dataset.defaults,
+            logbook_reader=None,
+            logger=mini_dataset.defaults.logger,
+        )
+        is True
     )
