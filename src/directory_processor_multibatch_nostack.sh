@@ -10,13 +10,13 @@ fi
 YMD="$1"
 MIN_BATCH="$2"
 MAX_BATCH="$3"
-PYTHON_BIN="${PYTHON_BIN:-python}"
+PROCESSOR_BIN="${MOUSE_DIRECTORY_PROCESSOR_BIN:-./.venv/bin/mouse-directory-processor}"
 
 # Iterate over the batch numbers within the specified range
 for ((batch=MIN_BATCH; batch<=MAX_BATCH; batch++)); do
     echo "Processing batch $batch for YMD $YMD"
 
-    "$PYTHON_BIN" src/directory_processor.py --config MOUSE_settings.yaml --ymd "$YMD" \
+    "$PROCESSOR_BIN" --config MOUSE_settings.yaml --ymd "$YMD" \
     --batch "$batch" --parallel --step-preset preprocess
 
     # Check if the last command was successful

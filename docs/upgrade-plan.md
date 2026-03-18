@@ -24,6 +24,7 @@ The following migration steps are now implemented in this repository:
 - `src/directory_processor.py` now emits lightweight per-step timing logs when profiling is enabled.
 - `src/directory_processor.py` now also creates per-repetition log files alongside generated `MOUSE_*.nxs` outputs when `log_per_datafile` is enabled.
 - `src/directory_processor.py` now exposes a clearer CLI with built-in step presets and discovery flags for steps and presets.
+- The shell wrappers in `src/` now call the installed `mouse-directory-processor` command instead of invoking `src/directory_processor.py` directly.
 - `processstep_translator_step_1.py`, `processstep_translator_step_2.py`, and `processstep_metadata_update.py` now skip expensive reruns when their outputs are already up to date.
 - `pytest.ini`, `requirements-dev.txt`, and a first `tests/` suite have been added.
 - `pyproject.toml` now provides package metadata, dependencies, and a `mouse-directory-processor` console entry point.
@@ -31,6 +32,7 @@ The following migration steps are now implemented in this repository:
 - `MOUSE_settings.yaml` now documents the `profile_steps` toggle.
 - `MOUSE_settings.yaml` and `README.md` now document `log_per_datafile`.
 - `README.md` now documents the preset-based CLI workflow and the discovery commands for steps and presets.
+- `README.md` now also makes the installed `mouse-directory-processor` console command the primary user-facing entry point.
 - `tests/` now also covers realistic Excel fixtures from `mouse_logbook/tests/data`.
 - `DirectoryProcessor` and `YMD_class` now use explicit exceptions for core path/argument validation instead of runtime `assert` statements.
 - The `repetition=0` orchestration path now works correctly instead of being rejected by truthiness checks.

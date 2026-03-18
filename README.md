@@ -116,6 +116,12 @@ The main entry point is:
 ./.venv/bin/mouse-directory-processor
 ```
 
+If you activate the virtual environment first, the same entry point is available directly as:
+
+```zsh
+mouse-directory-processor
+```
+
 You can inspect the available step modules and built-in presets with:
 
 ```zsh
@@ -170,10 +176,10 @@ If you need a custom subset of steps, use `--steps` instead of `--step-preset`:
   --steps processstep_translator_step_1 processstep_translator_step_2 processstep_metadata_update
 ```
 
-The shell wrappers in `src/` still work and now delegate to these presets. If you want them to use a specific interpreter, set `PYTHON_BIN`, for example:
+The shell wrappers in `src/` still work and now delegate to the installed `mouse-directory-processor` command. By default they use `./.venv/bin/mouse-directory-processor`, but you can override that with `MOUSE_DIRECTORY_PROCESSOR_BIN`, for example:
 
 ```zsh
-PYTHON_BIN=./.venv/bin/python ./src/directory_processor_multibatch_nostack.sh 20260311 1 1
+MOUSE_DIRECTORY_PROCESSOR_BIN=mouse-directory-processor ./src/directory_processor_multibatch_nostack.sh 20260311 1 1
 ```
 
 # top-level methods:
