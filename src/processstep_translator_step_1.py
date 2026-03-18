@@ -11,19 +11,34 @@ from YMD_class import extract_metadata_from_path
 can_process_repetitions_in_parallel = True
 
 
+def _is_step_1_output_up_to_date(dir_path: Path, defaults: DefaultsCarrier) -> bool:
+    ymd, batch, repetition = extract_metadata_from_path(dir_path)
+    input_file = dir_path / "im_craw.nxs"
+    output_file = dir_path / f"MOUSE_{ymd}_{batch}_{repetition}_step_1.nxs"
+    config_file = defaults.translator_template_dir / "BAM_new_MOUSE_xenocs_translator_configuration.yaml"
+    if not output_file.is_file():
+        return False
+    output_mtime = output_file.stat().st_mtime
+    return output_mtime >= max(input_file.stat().st_mtime, config_file.stat().st_mtime)
+
+
 def can_run(
     dir_path: Path, defaults: DefaultsCarrier, logbook_reader: LogbookReaderLike | None, logger: logging.Logger
 ) -> bool:
     """
     Checks if the translator step should run. Besides the base files, we don't need anything...
     """
-    if not processing_possible(dir_path):
+    missing_files = processing_possible(dir_path, return_list=True)
+    if missing_files:
         logger.info(
             f"Step 1 translation not possible for {dir_path}, required files missing... check DEBUG for details"
         )
         logger.debug(
-            f"Required files missing for step 1 translation not possible for {dir_path}. The following were not found: {processing_possible(dir_path, return_list=True)}"
+            f"Required files missing for step 1 translation not possible for {dir_path}. The following were not found: {missing_files}"
         )
+        return False
+    if _is_step_1_output_up_to_date(dir_path, defaults):
+        logger.info("Step 1 translation already up to date for %s", dir_path)
         return False
 
     return True

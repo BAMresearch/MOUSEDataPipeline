@@ -24,6 +24,7 @@ The following migration steps are now implemented in this repository:
 - `src/directory_processor.py` now emits lightweight per-step timing logs when profiling is enabled.
 - `src/directory_processor.py` now also creates per-repetition log files alongside generated `MOUSE_*.nxs` outputs when `log_per_datafile` is enabled.
 - `src/directory_processor.py` now exposes a clearer CLI with built-in step presets and discovery flags for steps and presets.
+- `processstep_translator_step_1.py`, `processstep_translator_step_2.py`, and `processstep_metadata_update.py` now skip expensive reruns when their outputs are already up to date.
 - `pytest.ini`, `requirements-dev.txt`, and a first `tests/` suite have been added.
 - `pyproject.toml` now provides package metadata, dependencies, and a `mouse-directory-processor` console entry point.
 - `requirements-dev.txt` now installs the project in editable mode through `-e .[dev]`.
@@ -42,17 +43,15 @@ The following migration steps are now implemented in this repository:
 - `pyproject.toml` now exposes the linting tools both as a `pip` extra and as a `uv` dependency group.
 - `periodictable` and `xraydb` are now declared directly as runtime dependencies because the `mouse_logbook` metadata writer requires them during chemistry and X-ray validation.
 - The removed obsolete modules are no longer referenced from `pyproject.toml`.
-- The current local test suite passes: 35 tests.
-
-What is still transitional:
-
-- Fresh-environment validation with full dependency resolution has not been exercised from scratch in this repository yet.
+- Fresh-environment validation has now been exercised successfully on Python 3.14 in both the runtime and `.[dev]` environments.
+- The current local test suite passes: 38 tests.
 
 ## Current State Observations
 
 - `src/directory_processor.py` now passes `None` to process steps unless a step explicitly opts in to reader construction.
 - Most process steps only accept the reader in their signature, and none of the active runtime steps currently dereference it directly.
 - `src/processstep_metadata_update.py` remains a thin CLI wrapper around `mouse_logbook`.
+- Expensive subprocess-heavy steps now avoid rerunning when their outputs are newer than their inputs and configuration sources.
 - The entry points still default to `python`, but the batch script now allows overriding the interpreter through `PYTHON_BIN`.
 - The repository now has `pytest` scaffolding, an editable-install path via `pyproject.toml`, updated README usage examples, and a small integration-oriented test suite.
 
@@ -75,8 +74,8 @@ The repository has already completed the dependency migration. The remaining wor
 1. Add a `pyproject.toml` for reproducible installs.
 2. Keep runtime and development dependencies split cleanly.
 3. Standardize the execution environment used by scripts and docs.
-   - Short term: call `./.venv/bin/python`
-   - Long term: expose a package CLI or console script
+   - Runtime and `.[dev]` installs have now been validated on Python 3.14
+   - The package CLI is in place, while shell wrappers remain convenience entry points
 4. Document `PYTHON_BIN` usage for the shell wrapper.
 5. Document `profile_steps` in `MOUSE_settings.yaml` and user-facing docs.
 
@@ -87,7 +86,7 @@ The repository has already completed the dependency migration. The remaining wor
 
 ### Status
 
-Partially complete.
+Mostly complete.
 
 - `pyproject.toml`, `requirements-dev.txt`, and `pytest.ini` exist.
 - Editable installation works with `./.venv/bin/python -m pip install -e '.[dev]' --no-deps`.
@@ -116,7 +115,8 @@ Partially complete.
   - per-repetition log-file creation and opt-out behavior in `DirectoryProcessor`
   - explicit logger-path usage in the standalone stacker script
   - CLI step-presets, step discovery, and preset discovery
-- The remaining packaging gap is full fresh-environment validation including dependency resolution from scratch.
+  - rerun-skipping behavior for translator step 1, translator step 2, and metadata update
+- The remaining packaging gap is mainly representative clean-room usage validation beyond installation itself.
 
 ### Linting Status
 
@@ -154,6 +154,7 @@ The first `pytest` scaffolding is in place. The next step is to cover the main f
 
 - In progress.
 - Current tests cover the happy path for metadata writing, metadata CLI failure propagation, lazy reader construction, profiling enable/disable behavior, parallel-error propagation, reader initialization on both synthetic and realistic Excel fixtures, metadata export using realistic Excel fixtures plus a synthetic `.nxs` file, translator step 2 subprocess dispatch, and small-file smoke/validation paths in the stacker, cleanup, background-file, beam-center, beam-mask, beam-flux, and thickness-related steps.
+- Current tests also cover rerun-skipping behavior for translator step 1, translator step 2, and metadata update.
 - The biggest gaps are broader orchestration coverage and smoke tests for more numerically heavy processing steps.
 
 ## Phase 3: Runtime Robustness Cleanup
@@ -178,6 +179,7 @@ The pipeline has now been profiled enough to identify the first hot spots. The i
 1. Run a representative batch with `profile_steps: true`.
 2. Collect step-level timings and identify the slowest stages.
    - Current measurements point to translator step 2 at roughly 10 s per repetition and metadata update at roughly 1.5 s per repetition.
+   - Cheap rerun-avoidance is now in place, so the remaining hot path is mostly first-run work rather than repeated development reruns.
 3. Separate likely costs:
    - HDF5 read/write I/O
    - translator template-copy overhead and HDF5 I/O
@@ -208,8 +210,8 @@ The highest-value next implementation step is:
 
 1. expand `pytest` coverage to selected real processing steps with small-file smoke tests
 2. keep using `pre-commit` on touched files and gradually widen `ruff` coverage once the touched-file workflow stays stable
-3. collect and review real profiling output from representative batches
-4. validate a clean install path with full dependency resolution in a fresh environment
-5. consider one or two small usability improvements for the CLI output, such as a `--show-config` view or friendlier preset descriptions
+3. collect and review real profiling output from representative first-run batches
+4. consider one or two small usability improvements for the CLI output, such as a `--show-config` view or friendlier preset descriptions
+5. if first-run performance still matters, evaluate whether thread-pool sizing should become a user-tunable config option for disk-heavy steps
 
 The dependency swap is complete in code. The remaining work is now testing, packaging, and cleanup.

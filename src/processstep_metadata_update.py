@@ -2,6 +2,7 @@ import logging
 import shutil
 import subprocess
 import sys
+from functools import lru_cache
 from pathlib import Path
 
 import h5py
@@ -18,6 +19,12 @@ using the mouse_logbook CLI writer.
 # Flag indicating whether this process step can be executed in parallel on multiple repetitions
 can_process_repetitions_in_parallel = True
 
+REQUIRED_METADATA_PATHS = (
+    "/entry1/sample/sampleowner",
+    "/entry1/proposal/proposalid",
+    "/entry1/processing_required_metadata/procpipeline",
+)
+
 
 def can_run(
     dir_path: Path,
@@ -33,7 +40,35 @@ def can_run(
     if not output_file.is_file():
         logger.info(f"metadata_updater cannot run in {dir_path}, file missing at: {output_file}")
         return False
+    if _metadata_is_up_to_date(output_file, defaults):
+        logger.info("Metadata update already up to date for %s", output_file)
+        return False
     return True
+
+
+@lru_cache(maxsize=None)
+def _get_projects_tree_mtime(projects_dir: str) -> float:
+    root = Path(projects_dir)
+    mtimes = [path.stat().st_mtime for path in root.rglob("*.xlsx") if path.is_file()]
+    return max(mtimes, default=0.0)
+
+
+def _has_required_metadata(output_file: Path) -> bool:
+    try:
+        with h5py.File(output_file, "r") as h5f:
+            return all(path in h5f for path in REQUIRED_METADATA_PATHS)
+    except OSError:
+        return False
+
+
+def _metadata_is_up_to_date(output_file: Path, defaults: DefaultsCarrier) -> bool:
+    if not _has_required_metadata(output_file):
+        return False
+    source_mtime = max(
+        defaults.logbook_file.stat().st_mtime,
+        _get_projects_tree_mtime(str(defaults.projects_dir.resolve())),
+    )
+    return output_file.stat().st_mtime >= source_mtime
 
 
 def _resolve_mouse_logbook_cli() -> Path:

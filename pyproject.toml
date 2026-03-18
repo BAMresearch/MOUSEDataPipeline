@@ -72,7 +72,7 @@ py-modules = [
 
 [tool.ruff]
 line-length = 120
-target-version = "py310"
+target-version = "py311"
 extend-exclude = [
     "notebooks/",
 ]

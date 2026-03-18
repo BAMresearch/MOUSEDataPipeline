@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import subprocess
 from pathlib import Path
 
@@ -78,3 +79,36 @@ def test_metadata_update_cli_writer_failure_propagates(mini_dataset, monkeypatch
             logbook_reader=None,
             logger=mini_dataset.defaults.logger,
         )
+
+
+def test_metadata_update_can_run_skips_when_metadata_is_up_to_date(mini_dataset):
+    with h5py.File(mini_dataset.output_file, "a") as h5f:
+        h5f.require_dataset(
+            "/entry1/sample/sampleowner",
+            shape=(),
+            dtype=h5py.string_dtype(encoding="utf-8"),
+        )[...] = "Project Owner"
+        h5f.require_dataset(
+            "/entry1/proposal/proposalid",
+            shape=(),
+            dtype=h5py.string_dtype(encoding="utf-8"),
+        )[...] = "2026001"
+        h5f.require_dataset(
+            "/entry1/processing_required_metadata/procpipeline",
+            shape=(),
+            dtype=h5py.string_dtype(encoding="utf-8"),
+        )[...] = "test-pipeline"
+
+    os.utime(mini_dataset.logbook_file, (100, 100))
+    os.utime(mini_dataset.project_file, (100, 100))
+    os.utime(mini_dataset.output_file, (200, 200))
+
+    assert (
+        processstep_metadata_update.can_run(
+            mini_dataset.repetition_dir,
+            mini_dataset.defaults,
+            logbook_reader=None,
+            logger=mini_dataset.defaults.logger,
+        )
+        is False
+    )
