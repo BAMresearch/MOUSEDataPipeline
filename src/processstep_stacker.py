@@ -99,6 +99,8 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: LogbookReader
                 "-a",
                 *files_as_str,  # <-- processed files go here
             ]
+            if defaults.stacker_match_detector_data_rank:
+                cmd.append("--match-detector-data-rank")
             logger.info(f"Starting stacker step for {parent_path}")
             logger.debug("Running stacker command: %s", " ".join(cmd))
             result = subprocess.run(cmd, check=True, capture_output=True, text=True)

@@ -36,6 +36,12 @@ def _write_stackable_input(filename: Path, data: np.ndarray, mask_file: Path):
     mask_file.write_text("mask", encoding="utf-8")
 
 
+def _write_dataset(filename: Path, path: str, data) -> None:
+    with h5py.File(filename, "a") as h5f:
+        array = np.asarray(data)
+        h5f.require_dataset(path, shape=array.shape, dtype=array.dtype)[...] = array
+
+
 def _read_scalar_string(dataset) -> str:
     value = dataset[()]
     if isinstance(value, bytes):
@@ -108,6 +114,44 @@ def test_stacker_main_uses_provided_logger(tmp_path: Path, caplog):
     )
 
     assert "Post-translation processing complete." in caplog.text
+
+
+def test_stacker_main_can_match_metadata_rank_to_detector_data(tmp_path: Path):
+    input_a = tmp_path / "inputs" / "a.nxs"
+    input_b = tmp_path / "inputs" / "b.nxs"
+    mask_file = tmp_path / "Masks" / "mask.nxs"
+    output_file = tmp_path / "stacked.nxs"
+    config_file = tmp_path / "stacker.yaml"
+
+    _write_stackable_input(input_a, np.full((1, 2, 3), 1.0, dtype=np.float32), mask_file)
+    _write_stackable_input(input_b, np.full((1, 2, 3), 3.0, dtype=np.float32), mask_file)
+    _write_dataset(input_a, "/entry1/sample/custom_metadata", np.array([7.0], dtype=np.float32))
+    _write_dataset(input_b, "/entry1/sample/custom_metadata", np.array([9.0], dtype=np.float32))
+    config_file.write_text(
+        "\n".join(
+            [
+                "stack_datasets:",
+                "  - entry1/instrument/detector00/data",
+                "  - entry1/sample/custom_metadata",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    post_translation_operation_hdf5_stacker.main(
+        output=output_file,
+        auxiliary_files=[input_a, input_b],
+        config=config_file,
+        match_detector_data_rank=True,
+    )
+
+    with h5py.File(output_file, "r") as h5f:
+        assert h5f["/entry1/instrument/detector00/data"].shape == (2, 1, 2, 3)
+        assert h5f["/entry1/sample/custom_metadata"].shape == (2, 1, 1, 1)
+        np.testing.assert_allclose(
+            h5f["/entry1/sample/custom_metadata"][()],
+            np.array([[[[7.0]]], [[[9.0]]]], dtype=np.float32),
+        )
 
 
 def test_stacker_main_requires_auxiliary_files(tmp_path: Path):

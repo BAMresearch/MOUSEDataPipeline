@@ -108,6 +108,7 @@ The configuration file also supports:
 - `logging_level: INFO` to make the profiling output visible during runs
 - `log_per_datafile: true` to write a `MOUSE_<ymd>_<batch>_<repetition>.processing.log` file next to each repetition output
 - `parallel_workers: 4` to cap the repetition thread-pool size for disk-heavy parallel steps; leave it unset to use Python's default
+- `stacker_match_detector_data_rank: true` to tell the stacker to pad lower-rank stacked metadata with trailing singleton dimensions up to the detector-data rank
 
 # CLI overview
 

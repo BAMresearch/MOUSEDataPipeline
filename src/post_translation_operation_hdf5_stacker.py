@@ -23,6 +23,7 @@ Usage:
 """
 
 LOGGER = logging.getLogger(__name__)
+PRIMARY_DATA_PATH = "entry1/instrument/detector00/data"
 
 
 def canStack(filename: Path, logger: logging.Logger | None = None) -> bool:
@@ -42,7 +43,7 @@ def canStack(filename: Path, logger: logging.Logger | None = None) -> bool:
     checkList = [
         # "entry1/experiment/environment_temperature",
         # "entry1/experiment/stage_temperature",
-        "entry1/instrument/detector00/data",  # assure primary data is there
+        PRIMARY_DATA_PATH,  # assure primary data is there
         "entry1/sample/beam/flux",  # beam analysis has been done
         "entry1/sample/beam/incident_wavelength",
         # "entry1/sample/thickness", # thickness calculation has been entered from the beam analysis
@@ -95,6 +96,7 @@ class newNewConcat(object):
         stackItems: list | None = None,
         calculate_average: list | None = None,
         adjust_relative_path_oneup: list | None = None,
+        match_detector_data_rank: bool = False,
         logger: logging.Logger | None = None,
     ):
         if not isinstance(outputFile, Path):
@@ -132,6 +134,8 @@ class newNewConcat(object):
         self.outputFile = outputFile
         self.stackItems = stackItems
         self.filenames = filenames
+        self.match_detector_data_rank = match_detector_data_rank
+        self.target_stacked_rank: int | None = None
 
         # use the first file as a template, increasing the size of the datasets to stack
 
@@ -210,6 +214,11 @@ class newNewConcat(object):
         """addShape is a tuple with the dimensions to add to the normal datasets. i.e. (280, 1) will add those dimensions to the array shape"""
         # input = nx.nxload(ifname)
         with h5py.File(ifname, "r") as h5in, h5py.File(self.outputFile, "w") as h5out:
+            if self.match_detector_data_rank:
+                if PRIMARY_DATA_PATH not in h5in:
+                    raise ValueError(f"primary data path {PRIMARY_DATA_PATH} not found in template file {ifname}")
+                self.target_stacked_rank = len(addShape) + len(h5in[PRIMARY_DATA_PATH].shape)
+
             # using h5py.visititems to walk the file
 
             def printLinkItem(name, obj):
@@ -230,9 +239,10 @@ class newNewConcat(object):
                     # h5out.create_dataset(name, data=obj[()])
                 elif isinstance(obj, h5py.Dataset) and name in self.stackItems:
                     self.logger.debug(
-                        f"preparing by initializing the stacked dataset: {name} to shape {(*addShape, *obj.shape)}"
+                        f"preparing by initializing the stacked dataset: {name} to shape "
+                        f"{self._stacked_output_shape(obj.shape, addShape)}"
                     )
-                    totalShape = (*addShape, *obj.shape)
+                    totalShape = self._stacked_output_shape(obj.shape, addShape)
                     chunkShape = list(totalShape)
                     chunkShape[0] = 1
                     h5out.create_dataset(
@@ -251,13 +261,35 @@ class newNewConcat(object):
             h5in.visititems(addItem)
             h5in.visititems_links(printLinkItem)
 
+    def _stacked_output_shape(self, dataset_shape: tuple[int, ...], addShape: tuple[int, ...]) -> tuple[int, ...]:
+        totalShape = (*addShape, *dataset_shape)
+        if self.target_stacked_rank is None or len(totalShape) >= self.target_stacked_rank:
+            return totalShape
+        return (*totalShape, *((1,) * (self.target_stacked_rank - len(totalShape))))
+
+    def _reshape_data_for_output(self, data, target_shape: tuple[int, ...]) -> np.ndarray:
+        array = np.asarray(data)
+        reshape_shape = (*array.shape, *((1,) * (len(target_shape) - array.ndim)))
+        try:
+            reshaped = array.reshape(reshape_shape)
+        except ValueError as exc:
+            raise ValueError(
+                f"could not reshape stacked dataset value from {array.shape} to target shape {target_shape}"
+            ) from exc
+        if reshaped.shape != target_shape:
+            raise ValueError(f"stacked dataset value has incompatible shape {reshaped.shape}; expected {target_shape}")
+        return reshaped
+
     def addDataToStack(self, ifname, addAtStackLocation):
         with h5py.File(ifname, "r") as h5in, h5py.File(self.outputFile, "a") as h5out:
             for path in self.stackItems:
                 if path in h5in and path in h5out:
                     self.logger.debug(f"adding data to stack: {path} at stackLocation: {addAtStackLocation}")
-                    # print(f'adding data to stack: {path} at stackLocation: {addAtStackLocation}')
-                    h5out[path][addAtStackLocation] = h5in[path][()]
+                    data = h5in[path][()]
+                    target_shape = h5out[path][addAtStackLocation].shape
+                    if np.shape(data) != target_shape:
+                        data = self._reshape_data_for_output(data, target_shape)
+                    h5out[path][addAtStackLocation] = data
                 elif path not in h5in:
                     self.logger.warning(f"** could not find path {path} in input file,. skipping...")
                 elif path not in h5out:
@@ -271,6 +303,7 @@ def main(
     output: Path,
     auxiliary_files: list[Path],
     config: Path,
+    match_detector_data_rank: bool = False,
     logger: logging.Logger | None = None,
 ):
     """ """
@@ -297,6 +330,7 @@ def main(
         stack_datasets,
         calculate_average,
         adjust_relative_path_oneup,
+        match_detector_data_rank=match_detector_data_rank,
         logger=logger,
     )
 
@@ -351,6 +385,14 @@ def setup_argparser():
         action="store_true",
         help="Write log out to a timestamped file.",
     )
+    parser.add_argument(
+        "--match-detector-data-rank",
+        action="store_true",
+        help=(
+            "Pad stacked datasets with trailing singleton dimensions until they have the same rank as "
+            f"{PRIMARY_DATA_PATH}."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -372,4 +414,10 @@ if __name__ == "__main__":
         for auxiliary_file in args.auxiliary_files:
             LOGGER.info(f"stacking source file: {auxiliary_file}")
 
-    main(args.output, args.auxiliary_files, args.config, logger=LOGGER)
+    main(
+        args.output,
+        args.auxiliary_files,
+        args.config,
+        match_detector_data_rank=args.match_detector_data_rank,
+        logger=LOGGER,
+    )

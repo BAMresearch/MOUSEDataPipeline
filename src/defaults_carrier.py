@@ -96,6 +96,7 @@ class DefaultsCarrier:
         converter=convert_to_int_or_none,
         validator=[if_not_none_is_positive_int],
     )
+    stacker_match_detector_data_rank: bool = attrs.field(default=False)
     log_to_file: bool = attrs.field(default=False)
     log_file: Optional[Path] = attrs.field(default=None, converter=convert_to_path_or_none)
     logger: logging.Logger = attrs.field(init=False)
@@ -178,6 +179,7 @@ def create_defaults_carrier_from_config(config_file: Optional[str] = None) -> De
         profile_steps=config.get("profile_steps", True),
         log_per_datafile=config.get("log_per_datafile", True),
         parallel_workers=config.get("parallel_workers", None),
+        stacker_match_detector_data_rank=config.get("stacker_match_detector_data_rank", False),
         log_to_file=config.get("log_to_file", False),
         log_file=config.get("log_file", None),
     )

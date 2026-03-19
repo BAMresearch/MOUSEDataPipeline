@@ -23,3 +23,7 @@ log_per_datafile: true
 # Optional override for the repetition thread-pool size during parallel batch processing.
 # Leave unset to use Python's default ThreadPoolExecutor worker count.
 parallel_workers: null
+
+# Pad stacked metadata datasets with trailing singleton dimensions so they match
+# the rank of /entry1/instrument/detector00/data in the stacked output.
+stacker_match_detector_data_rank: false

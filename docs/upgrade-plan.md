@@ -26,6 +26,7 @@ The following migration steps are now implemented in this repository:
 - `src/directory_processor.py` now also creates per-repetition log files alongside generated `MOUSE_*.nxs` outputs when `log_per_datafile` is enabled.
 - `src/directory_processor.py` now exposes a clearer CLI with built-in step presets and discovery flags for steps and presets.
 - `src/directory_processor.py` and `DefaultsCarrier` now support a `parallel_workers` override to tune repetition-level thread-pool size for disk-heavy batch runs.
+- `DefaultsCarrier`, `MOUSE_settings.yaml`, and `processstep_stacker.py` now support forwarding the stacker `--match-detector-data-rank` option through normal pipeline runs.
 - The shell wrappers in `src/` now call the installed `mouse-directory-processor` command instead of invoking `src/directory_processor.py` directly.
 - `processstep_translator_step_1.py`, `processstep_translator_step_2.py`, and `processstep_metadata_update.py` now skip expensive reruns when their outputs are already up to date.
 - `pytest.ini`, `requirements-dev.txt`, and a first `tests/` suite have been added.
@@ -34,6 +35,7 @@ The following migration steps are now implemented in this repository:
 - `MOUSE_settings.yaml` now documents the `profile_steps` toggle.
 - `MOUSE_settings.yaml` and `README.md` now document `log_per_datafile`.
 - `MOUSE_settings.yaml`, the CLI, and `README.md` now document `parallel_workers` for first-run performance tuning.
+- `MOUSE_settings.yaml` and `README.md` now also document `stacker_match_detector_data_rank` for stacked metadata rank-padding.
 - `README.md` now documents the preset-based CLI workflow and the discovery commands for steps and presets.
 - `README.md` now also makes the installed `mouse-directory-processor` console command the primary user-facing entry point.
 - `tests/` now also covers realistic Excel fixtures from `mouse_logbook/tests/data`.
@@ -41,6 +43,7 @@ The following migration steps are now implemented in this repository:
 - The `repetition=0` orchestration path now works correctly instead of being rejected by truthiness checks.
 - `utilities.py`, `processstep_thickness_from_absorption.py`, and `processstep_make_beam_mask.py` now use explicit validation exceptions instead of runtime `assert` statements in their core guard rails.
 - `post_translation_operation_hdf5_stacker.py` and `processstep_calc_beam_flux_and_transmissions.py` now also use explicit validation exceptions instead of runtime `assert` statements in active runtime paths.
+- `post_translation_operation_hdf5_stacker.py` now also exposes an optional `--match-detector-data-rank` flag to pad stacked metadata datasets with trailing singleton dimensions up to the rank of `/entry1/instrument/detector00/data`.
 - `processstep_determine_beam_center.py`, `processstep_thickness_from_absorption.py`, and `processstep_stacker.py` no longer write progress/debug information to stdout; they now use logger output instead.
 - Active `skimage` deprecation warnings have been addressed by updating beam-feature cleanup and weighted-centroid access to the current API.
 - Beam-analysis compatibility shims now support both older and newer `scikit-image` APIs for morphology cleanup and weighted-centroid access.
@@ -50,7 +53,7 @@ The following migration steps are now implemented in this repository:
 - `periodictable` and `xraydb` are now declared directly as runtime dependencies because the `mouse_logbook` metadata writer requires them during chemistry and X-ray validation.
 - The removed obsolete modules are no longer referenced from `pyproject.toml`.
 - Fresh-environment validation has now been exercised successfully on Python 3.14 in both the runtime and `.[dev]` environments.
-- The current local test suite passes: 44 tests.
+- The current local test suite passes: 45 tests.
 
 ## Current State Observations
 
@@ -116,6 +119,7 @@ Mostly complete.
   - cleanup of intermediate step-1 output files
   - explicit validation failures in `processstep_thickness_from_absorption` and `processstep_make_beam_mask`
   - stacker configuration and input validation plus a synthetic stacker smoke test
+  - optional stacker rank-padding behavior for low-rank metadata datasets
   - explicit validation failure for a mismatched beam-coverage mask in `processstep_calc_beam_flux_and_transmissions`
   - beam-center smoke testing with a synthetic detector image
   - quiet execution for stacker, thickness, and beam-center steps without stray stdout output
@@ -124,6 +128,7 @@ Mostly complete.
   - CLI step-presets, step discovery, and preset discovery
   - rerun-skipping behavior for translator step 1, translator step 2, and metadata update
   - configurable parallel worker limits in both config and CLI
+  - forwarding of the stacker rank-padding flag through `processstep_stacker`
   - compatibility behavior across older and newer `scikit-image` APIs used in beam analysis
 - The remaining packaging gap is mainly representative clean-room usage validation beyond installation itself.
 

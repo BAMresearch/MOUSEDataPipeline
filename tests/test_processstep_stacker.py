@@ -40,4 +40,34 @@ def test_stacker_logs_command_without_printing(mini_dataset, monkeypatch, caplog
         "python3",
         str(mini_dataset.defaults.post_translation_dir / "post_translation_operation_hdf5_stacker.py"),
     ]
+    assert "--match-detector-data-rank" not in calls[0]
     assert "Running stacker command:" in caplog.text
+
+
+def test_stacker_forwards_match_detector_data_rank_flag(mini_dataset, monkeypatch):
+    processed_file = mini_dataset.repetition_dir / f"MOUSE_{mini_dataset.ymd}_{mini_dataset.batch_num}_0.nxs"
+    processed_file.write_bytes(b"processed")
+    calls: list[list[str]] = []
+
+    def fake_run(cmd, **kwargs):
+        calls.append(cmd)
+        return SimpleNamespace(stdout="stacked")
+
+    mini_dataset.defaults.stacker_match_detector_data_rank = True
+    monkeypatch.setattr(processstep_stacker, "get_processed_files", lambda dir_path: [processed_file])
+    monkeypatch.setattr(
+        processstep_stacker,
+        "sort_processed_files_by_instrument_configuration",
+        lambda processed_files, logger: {"7": processed_files},
+    )
+    monkeypatch.setattr(processstep_stacker.subprocess, "run", fake_run)
+
+    processstep_stacker.run(
+        mini_dataset.repetition_dir,
+        mini_dataset.defaults,
+        logbook_reader=None,
+        logger=mini_dataset.defaults.logger,
+    )
+
+    assert len(calls) == 1
+    assert "--match-detector-data-rank" in calls[0]
