@@ -44,6 +44,7 @@ The following migration steps are now implemented in this repository:
 - `utilities.py`, `processstep_thickness_from_absorption.py`, and `processstep_make_beam_mask.py` now use explicit validation exceptions instead of runtime `assert` statements in their core guard rails.
 - `post_translation_operation_hdf5_stacker.py` and `processstep_calc_beam_flux_and_transmissions.py` now also use explicit validation exceptions instead of runtime `assert` statements in active runtime paths.
 - `post_translation_operation_hdf5_stacker.py` now also exposes an optional `--match-detector-data-rank` flag to pad stacked metadata datasets with trailing singleton dimensions up to the rank of `/entry1/instrument/detector00/data`.
+- `post_translation_operation_hdf5_stacker.py` now defaults stacked dataset compression to `lzf`, supports `compression: none|lzf|gzip` in the stacker YAML (and `--compression` on the CLI), keeps the output file open across the stacking loop, and skips link-tree debug traversal unless debug logging is enabled.
 - `processstep_determine_beam_center.py`, `processstep_thickness_from_absorption.py`, and `processstep_stacker.py` no longer write progress/debug information to stdout; they now use logger output instead.
 - Active `skimage` deprecation warnings have been addressed by updating beam-feature cleanup and weighted-centroid access to the current API.
 - Beam-analysis compatibility shims now support both older and newer `scikit-image` APIs for morphology cleanup and weighted-centroid access.
@@ -53,7 +54,7 @@ The following migration steps are now implemented in this repository:
 - `periodictable` and `xraydb` are now declared directly as runtime dependencies because the `mouse_logbook` metadata writer requires them during chemistry and X-ray validation.
 - The removed obsolete modules are no longer referenced from `pyproject.toml`.
 - Fresh-environment validation has now been exercised successfully on Python 3.14 in both the runtime and `.[dev]` environments.
-- The current local test suite passes: 45 tests.
+- The current local test suite passes: 47 tests.
 
 ## Current State Observations
 
@@ -118,7 +119,7 @@ Mostly complete.
   - background-file metadata writing with a synthetic `.nxs` file
   - cleanup of intermediate step-1 output files
   - explicit validation failures in `processstep_thickness_from_absorption` and `processstep_make_beam_mask`
-  - stacker configuration and input validation plus a synthetic stacker smoke test
+  - stacker configuration, compression selection, and input validation plus a synthetic stacker smoke test
   - optional stacker rank-padding behavior for low-rank metadata datasets
   - explicit validation failure for a mismatched beam-coverage mask in `processstep_calc_beam_flux_and_transmissions`
   - beam-center smoke testing with a synthetic detector image

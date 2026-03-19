@@ -110,6 +110,12 @@ The configuration file also supports:
 - `parallel_workers: 4` to cap the repetition thread-pool size for disk-heavy parallel steps; leave it unset to use Python's default
 - `stacker_match_detector_data_rank: true` to tell the stacker to pad lower-rank stacked metadata with trailing singleton dimensions up to the detector-data rank
 
+The stacker YAML also supports a top-level `compression:` key for stacked datasets:
+
+- `compression: lzf` is now the fast default
+- `compression: none` is the best option if write speed matters more than file size
+- `compression: gzip` keeps the old smaller-but-slower behavior
+
 # CLI overview
 
 The main entry point is:

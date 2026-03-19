@@ -154,6 +154,36 @@ def test_stacker_main_can_match_metadata_rank_to_detector_data(tmp_path: Path):
         )
 
 
+def test_stacker_main_supports_uncompressed_output_from_config(tmp_path: Path):
+    input_a = tmp_path / "inputs" / "a.nxs"
+    input_b = tmp_path / "inputs" / "b.nxs"
+    mask_file = tmp_path / "Masks" / "mask.nxs"
+    output_file = tmp_path / "stacked.nxs"
+    config_file = tmp_path / "stacker.yaml"
+
+    _write_stackable_input(input_a, np.full((2, 2), 1.0, dtype=np.float32), mask_file)
+    _write_stackable_input(input_b, np.full((2, 2), 3.0, dtype=np.float32), mask_file)
+    config_file.write_text(
+        "\n".join(
+            [
+                "compression: none",
+                "stack_datasets:",
+                "  - entry1/instrument/detector00/data",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    post_translation_operation_hdf5_stacker.main(
+        output=output_file,
+        auxiliary_files=[input_a, input_b],
+        config=config_file,
+    )
+
+    with h5py.File(output_file, "r") as h5f:
+        assert h5f["/entry1/instrument/detector00/data"].compression is None
+
+
 def test_stacker_main_requires_auxiliary_files(tmp_path: Path):
     config_file = tmp_path / "stacker.yaml"
     config_file.write_text("stack_datasets: []\n", encoding="utf-8")

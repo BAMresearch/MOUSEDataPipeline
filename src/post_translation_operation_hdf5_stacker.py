@@ -24,6 +24,19 @@ Usage:
 
 LOGGER = logging.getLogger(__name__)
 PRIMARY_DATA_PATH = "entry1/instrument/detector00/data"
+DEFAULT_STACK_COMPRESSION = "lzf"
+SUPPORTED_STACK_COMPRESSIONS = {"none": None, "lzf": "lzf", "gzip": "gzip"}
+
+
+def normalize_stack_compression(compression: str | None) -> str | None:
+    if compression is None:
+        return SUPPORTED_STACK_COMPRESSIONS[DEFAULT_STACK_COMPRESSION]
+    normalized = str(compression).strip().lower()
+    if normalized not in SUPPORTED_STACK_COMPRESSIONS:
+        raise ValueError(
+            f"unsupported stack compression {compression!r}; expected one of {', '.join(SUPPORTED_STACK_COMPRESSIONS)}"
+        )
+    return SUPPORTED_STACK_COMPRESSIONS[normalized]
 
 
 def canStack(filename: Path, logger: logging.Logger | None = None) -> bool:
@@ -97,6 +110,7 @@ class newNewConcat(object):
         calculate_average: list | None = None,
         adjust_relative_path_oneup: list | None = None,
         match_detector_data_rank: bool = False,
+        compression: str | None = None,
         logger: logging.Logger | None = None,
     ):
         if not isinstance(outputFile, Path):
@@ -136,79 +150,80 @@ class newNewConcat(object):
         self.filenames = filenames
         self.match_detector_data_rank = match_detector_data_rank
         self.target_stacked_rank: int | None = None
+        self.compression = normalize_stack_compression(compression)
 
         # use the first file as a template, increasing the size of the datasets to stack
 
         self.createStructureFromFile(filenames[0], addShape=(len(filenames),))  # addShape = (len(filenames), 1)
 
         # add the datasets to the file.. this could perhaps be done in parallel
-        for idx, filename in enumerate(filenames):
-            # print(f'adding file {idx+1} of {len(filenames)}: {filename}')
-            self.addDataToStack(filename, addAtStackLocation=idx)
+        with h5py.File(self.outputFile, "a") as h5out:
+            for idx, filename in enumerate(filenames):
+                with h5py.File(filename, "r") as h5in:
+                    self.addDataToStack(h5in, h5out, addAtStackLocation=idx)
 
         # now we calculate the mean, std and standard error on the mean of selected datasets:
-        for path in calculate_average:
-            self.calculateAverage(path)
+        with h5py.File(self.outputFile, "a") as h5out:
+            for path in calculate_average:
+                self.calculateAverage(h5out, path)
 
-        for path in adjust_relative_path_oneup:
-            self.adjustRelativePath(path)
+            for path in adjust_relative_path_oneup:
+                self.adjustRelativePath(h5out, path)
 
-    def adjustRelativePath(self, path):
+    def adjustRelativePath(self, h5out: h5py.File, path):
         """
         adjusts the relative paths in the location to be one level up,
         e.g. "../../Mask/file.nxs" becomes "../Mask/file.nxs"
         """
-        with h5py.File(self.outputFile, "a") as h5out:
-            if path not in h5out:
-                self.logger.warning(f"path {path} not found in output file, skipping")
-                return
+        if path not in h5out:
+            self.logger.warning(f"path {path} not found in output file, skipping")
+            return
 
-            oldPath = h5out[path][()]
-            if oldPath is None:
-                self.logger.debug(f"path {path} is empty, skipping")
-                return
-            if isinstance(oldPath, bytes):
-                oldPath = oldPath.decode("utf-8")
+        oldPath = h5out[path][()]
+        if oldPath is None:
+            self.logger.debug(f"path {path} is empty, skipping")
+            return
+        if isinstance(oldPath, bytes):
+            oldPath = oldPath.decode("utf-8")
 
-            if oldPath == "":
-                self.logger.debug(f"path {path} is empty, skipping")
-                return
-            oldPath = Path(h5out[path][()].decode("utf-8"))
-            try:
-                newPath = oldPath.relative_to("..")
-            except ValueError:
-                self.logger.warning(f"path {path} already at root level or cannot be made relative to parent, skipping")
-                return
-            h5out[path][...] = str(newPath)
+        if oldPath == "":
+            self.logger.debug(f"path {path} is empty, skipping")
+            return
+        oldPath = Path(oldPath)
+        try:
+            newPath = oldPath.relative_to("..")
+        except ValueError:
+            self.logger.warning(f"path {path} already at root level or cannot be made relative to parent, skipping")
+            return
+        h5out[path][...] = str(newPath)
 
-    def calculateAverage(self, path):
-        with h5py.File(self.outputFile, "a") as h5out:
-            if path in h5out:
-                self.logger.debug(f"calculating average for path: {path}")
-                data = h5out[path][()]
-                # assure data is an array with dtype float
-                data = np.array(data, dtype=float)
-                attributes = h5out[path].attrs
-                newattrs = {k: attributes[k] for k in attributes.keys()}
-                # make sure there's a note in newattrs:
-                if "note" not in newattrs:
-                    newattrs["note"] = ""
-                newattrs["note"] = newattrs["note"] + " averaged for repetitions using post_translation_hdf5_stacker.py"
-                ds = h5out.create_dataset(f"{path}_averaged/mean", data=data.mean())
-                ds.attrs.update(newattrs)
-                ds = h5out.create_dataset(f"{path}_averaged/std", data=data.std(ddof=1))
-                ds.attrs.update(newattrs)
-                ds = h5out.create_dataset(f"{path}_averaged/sem", data=data.std(ddof=1) / np.sqrt(np.size(data)))
-                ds.attrs.update(newattrs)
-                ds = h5out.create_dataset(f"{path}_averaged/max", data=data.max())
-                ds.attrs.update(newattrs)
-                ds = h5out.create_dataset(f"{path}_averaged/min", data=data.min())
-                ds.attrs.update(newattrs)
-                ds = h5out.create_dataset(f"{path}_averaged/count", data=np.size(data))
-                newattrs.update({"units": "dimensionless"})
-                ds.attrs.update(newattrs)  # count has no units
-            else:
-                self.logger.warning(f"path {path} not found in output file, skipping average calculation")
+    def calculateAverage(self, h5out: h5py.File, path):
+        if path in h5out:
+            self.logger.debug(f"calculating average for path: {path}")
+            data = h5out[path][()]
+            # assure data is an array with dtype float
+            data = np.array(data, dtype=float)
+            attributes = h5out[path].attrs
+            newattrs = {k: attributes[k] for k in attributes.keys()}
+            # make sure there's a note in newattrs:
+            if "note" not in newattrs:
+                newattrs["note"] = ""
+            newattrs["note"] = newattrs["note"] + " averaged for repetitions using post_translation_hdf5_stacker.py"
+            ds = h5out.create_dataset(f"{path}_averaged/mean", data=data.mean())
+            ds.attrs.update(newattrs)
+            ds = h5out.create_dataset(f"{path}_averaged/std", data=data.std(ddof=1))
+            ds.attrs.update(newattrs)
+            ds = h5out.create_dataset(f"{path}_averaged/sem", data=data.std(ddof=1) / np.sqrt(np.size(data)))
+            ds.attrs.update(newattrs)
+            ds = h5out.create_dataset(f"{path}_averaged/max", data=data.max())
+            ds.attrs.update(newattrs)
+            ds = h5out.create_dataset(f"{path}_averaged/min", data=data.min())
+            ds.attrs.update(newattrs)
+            ds = h5out.create_dataset(f"{path}_averaged/count", data=np.size(data))
+            newattrs.update({"units": "dimensionless"})
+            ds.attrs.update(newattrs)  # count has no units
+        else:
+            self.logger.warning(f"path {path} not found in output file, skipping average calculation")
 
     def createStructureFromFile(self, ifname, addShape):
         """addShape is a tuple with the dimensions to add to the normal datasets. i.e. (280, 1) will add those dimensions to the array shape"""
@@ -220,9 +235,6 @@ class newNewConcat(object):
                 self.target_stacked_rank = len(addShape) + len(h5in[PRIMARY_DATA_PATH].shape)
 
             # using h5py.visititems to walk the file
-
-            def printLinkItem(name, obj):
-                self.logger.debug(f"Link item found: {name= }, {obj= }")  # noqa: E202, E251
 
             def addItem(name, obj):
                 if "entry1/instrument/detector/detectorSpecific" in name:
@@ -243,23 +255,24 @@ class newNewConcat(object):
                         f"{self._stacked_output_shape(obj.shape, addShape)}"
                     )
                     totalShape = self._stacked_output_shape(obj.shape, addShape)
-                    chunkShape = list(totalShape)
-                    chunkShape[0] = 1
-                    h5out.create_dataset(
-                        name,
-                        shape=totalShape,
-                        chunks=tuple(chunkShape),
-                        maxshape=totalShape,
-                        dtype=obj.dtype,
-                        compression="gzip",  # if we switch on gzip compression, this operation becomes very slow
-                        # data = obj[()]
-                    )
+                    dataset_kwargs = {
+                        "shape": totalShape,
+                        "maxshape": totalShape,
+                        "dtype": obj.dtype,
+                    }
+                    if self.compression is not None:
+                        chunkShape = list(totalShape)
+                        chunkShape[0] = 1
+                        dataset_kwargs["chunks"] = tuple(chunkShape)
+                        dataset_kwargs["compression"] = self.compression
+                    h5out.create_dataset(name, **dataset_kwargs)
                     h5out[name].attrs.update(obj.attrs)
                 else:
                     self.logger.info(f"** uncaught object: {name}")
 
             h5in.visititems(addItem)
-            h5in.visititems_links(printLinkItem)
+            if self.logger.isEnabledFor(logging.DEBUG):
+                h5in.visititems_links(lambda name, obj: self.logger.debug(f"Link item found: {name= }, {obj= }"))
 
     def _stacked_output_shape(self, dataset_shape: tuple[int, ...], addShape: tuple[int, ...]) -> tuple[int, ...]:
         totalShape = (*addShape, *dataset_shape)
@@ -280,22 +293,21 @@ class newNewConcat(object):
             raise ValueError(f"stacked dataset value has incompatible shape {reshaped.shape}; expected {target_shape}")
         return reshaped
 
-    def addDataToStack(self, ifname, addAtStackLocation):
-        with h5py.File(ifname, "r") as h5in, h5py.File(self.outputFile, "a") as h5out:
-            for path in self.stackItems:
-                if path in h5in and path in h5out:
-                    self.logger.debug(f"adding data to stack: {path} at stackLocation: {addAtStackLocation}")
-                    data = h5in[path][()]
-                    target_shape = h5out[path][addAtStackLocation].shape
-                    if np.shape(data) != target_shape:
-                        data = self._reshape_data_for_output(data, target_shape)
-                    h5out[path][addAtStackLocation] = data
-                elif path not in h5in:
-                    self.logger.warning(f"** could not find path {path} in input file,. skipping...")
-                elif path not in h5out:
-                    self.logger.warning(f"** could not find path {path} in output file, skipping...")
-                else:
-                    self.logger.warning(f"** uncaught error with path {path}, skipping...")
+    def addDataToStack(self, h5in: h5py.File, h5out: h5py.File, addAtStackLocation):
+        for path in self.stackItems:
+            if path in h5in and path in h5out:
+                self.logger.debug(f"adding data to stack: {path} at stackLocation: {addAtStackLocation}")
+                data = h5in[path][()]
+                target_shape = h5out[path][addAtStackLocation].shape
+                if np.shape(data) != target_shape:
+                    data = self._reshape_data_for_output(data, target_shape)
+                h5out[path][addAtStackLocation] = data
+            elif path not in h5in:
+                self.logger.warning(f"** could not find path {path} in input file,. skipping...")
+            elif path not in h5out:
+                self.logger.warning(f"** could not find path {path} in output file, skipping...")
+            else:
+                self.logger.warning(f"** uncaught error with path {path}, skipping...")
 
 
 # If you are adjusting the template for your needs, you probably only need to touch the main function:
@@ -304,6 +316,7 @@ def main(
     auxiliary_files: list[Path],
     config: Path,
     match_detector_data_rank: bool = False,
+    compression: str | None = None,
     logger: logging.Logger | None = None,
 ):
     """ """
@@ -319,6 +332,7 @@ def main(
         stack_datasets = config.get("stack_datasets", None)
         calculate_average = config.get("calculate_average", None)
         adjust_relative_path_oneup = config.get("adjust_relative_path_oneup", None)
+        configured_compression = config.get("compression", None)
     # at least the stack_datasets dictionary must exist:
     if stack_datasets is None:
         raise ValueError("The configuration file must contain a 'stack_datasets' section.")
@@ -331,6 +345,7 @@ def main(
         calculate_average,
         adjust_relative_path_oneup,
         match_detector_data_rank=match_detector_data_rank,
+        compression=compression if compression is not None else configured_compression,
         logger=logger,
     )
 
@@ -393,6 +408,15 @@ def setup_argparser():
             f"{PRIMARY_DATA_PATH}."
         ),
     )
+    parser.add_argument(
+        "--compression",
+        choices=tuple(SUPPORTED_STACK_COMPRESSIONS),
+        default=None,
+        help=(
+            "Compression for stacked datasets. "
+            f"Defaults to {DEFAULT_STACK_COMPRESSION!r}. Use 'none' for maximum write speed."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -419,5 +443,6 @@ if __name__ == "__main__":
         args.auxiliary_files,
         args.config,
         match_detector_data_rank=args.match_detector_data_rank,
+        compression=args.compression,
         logger=LOGGER,
     )
