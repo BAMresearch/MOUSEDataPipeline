@@ -68,6 +68,7 @@ def beamAnalysis(imageData: np.ndarray, ROI_SIZE: int) -> (tuple, float):
     print(weighted_center_of_mass, brightest_pixel)
     # mask if the brightest pixel is far away from the center of mass
     if ((np.array(brightest_pixel) - np.array(weighted_center_of_mass))**2).sum() > 50:
+        maskedTwoDImage[brightest_pixel] = 0
 
     threshold_value = np.maximum(
         1, 0.0001 * maskedTwoDImage.max()
