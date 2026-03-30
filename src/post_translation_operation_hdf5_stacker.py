@@ -110,8 +110,11 @@ class newNewConcat(object):
 
         # use the first file as a template, increasing the size of the datasets to stack
 
-        self.createStructureFromFile(filenames[0], addShape = (len(filenames),)) # addShape = (len(filenames), 1)
+        self.createStructureFromFile(filenames[-1], addShape = (len(filenames),)) # addShape = (len(filenames), 1)
 
+        # sort files by their names (in reverse order for reflectivity)
+        logging.debug(filenames[0].name)
+        filenames = sorted(filenames, key = lambda x: int(x.name.rstrip(".nxs").split("_")[-1]), reverse=True)
         # add the datasets to the file.. this could perhaps be done in parallel
         for idx, filename in enumerate(filenames): 
             print(f'adding file {idx+1} of {len(filenames)}: {filename}')
