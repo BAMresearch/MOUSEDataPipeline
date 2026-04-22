@@ -13,7 +13,7 @@ def can_run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2M
     """
     Checks if the translator step should run. Besides the base files, we don't need anything...
     """
-    ymd, batch, repetition = extract_metadata_from_path(dir_path)
+    ymd, batch, repetition = extract_metadata_from_path(dir_path.parent.parent)
     step_1_file = dir_path / f'MOUSE_{ymd}_{batch}_{repetition}_step_1.nxs'
     if not step_1_file.is_file():
         logger.info(f"Step 2 translation not possible for {dir_path}, step 1 result file missing at: {step_1_file}")
