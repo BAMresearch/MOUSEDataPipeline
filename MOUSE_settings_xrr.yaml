@@ -11,7 +11,7 @@ post_translation_dir: "/mnt/vsi-db/Measurements/SAXS002/processingCode/MOUSEData
 # Directory where HDF5Translator templates reside
 translator_template_dir: "/mnt/vsi-db/Measurements/SAXS002/data/TranslatorConfigurations"
 
-stacker_config_file: "/mnt/vsi-db/Measurements/SAXS002/data/StackerConfigurations/stacker_config.yaml"
+stacker_config_file: "/mnt/vsi-db/Measurements/SAXS002/data/StackerConfigurations/stacker_config_xrr.yaml"
 
 # We use a separate logbook for processing. Make sure to set the "use" flag to True for all entries that should be searched
 logbook_file: "/mnt/vsi-db/Measurements/SAXS002/logbooks/Logbook_MOUSE_Dataprocessing.xlsx"
