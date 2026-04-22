@@ -22,7 +22,10 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
     """
     Executes the translator processing step.
     """
-    ymd, batch, repetition = extract_metadata_from_path(dir_path)
+    if "scan_" in dir_path.stem:
+        ymd, batch, repetition = extract_metadata_from_path(dir_path.parent.parent)
+    else:
+        ymd, batch, repetition = extract_metadata_from_path(dir_path)
     step_1_file = dir_path / f'MOUSE_{ymd}_{batch}_{repetition}_step_1.nxs'
     # add any other temporary files that might be created during processing
 

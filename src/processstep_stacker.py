@@ -18,7 +18,10 @@ WIP: This special processing step combines all repetitions in a batch.
 can_process_repetitions_in_parallel = False # we do this once per batch, so if we do it for one repetition, we don't need to do it again
 
 def get_processed_files(dir_path: Path) -> List[Path]:
-    ymd, batch, repetition = extract_metadata_from_path(dir_path)
+    if "scan_" in dir_path.stem:
+        ymd, batch, repetition = extract_metadata_from_path(dir_path.parent.parent)
+    else:
+        ymd, batch, repetition = extract_metadata_from_path(dir_path)
     parent_path = dir_path.parent
     print(parent_path)
     processed_files = list(parent_path.glob(f'{ymd.YMD}_{batch}_*/MOUSE_{ymd.YMD}_{batch}_*.nxs'))
@@ -77,7 +80,10 @@ def can_run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2M
     3) check if the date of that latest processed file is newer than the date of the stacked file this process produces. 
     If 0 or 3 are true, we need to run this step.
     """
-    ymd, batch, repetition = extract_metadata_from_path(dir_path)
+    if "scan_" in dir_path.stem:
+        ymd, batch, repetition = extract_metadata_from_path(dir_path.parent.parent)
+    else:
+        ymd, batch, repetition = extract_metadata_from_path(dir_path)
     processed_files = get_processed_files(dir_path)
     files_by_config = sort_processed_files_by_instrument_configuration(processed_files, logger)
 
@@ -94,8 +100,12 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
     """
     Executes the translator processing step.
     """
-    try:
+    if "scan_" in dir_path.stem:
+        ymd, batch, repetition = extract_metadata_from_path(dir_path.parent.parent)
+    else:
         ymd, batch, repetition = extract_metadata_from_path(dir_path)
+    
+    try:
         parent_path = dir_path.parent
         pto_file = defaults.post_translation_dir / 'post_translation_operation_hdf5_stacker.py'
         processed_files = get_processed_files(dir_path) # [str(f) for f in get_processed_files(dir_path)]
