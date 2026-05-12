@@ -1,4 +1,5 @@
 import concurrent.futures
+import contextvars
 import hashlib
 import importlib
 import logging
@@ -11,6 +12,7 @@ import attrs
 
 from defaults_carrier import DefaultsCarrier, load_config_from_yaml
 from logbook_support import LogbookReaderLike, build_logbook_reader
+from utilities import processed_file_scope
 from YMD_class import YMD, extract_metadata_from_path
 
 STEP_PRESETS: dict[str, list[str]] = {
@@ -62,6 +64,8 @@ class DirectoryProcessor:
     logbook_reader: LogbookReaderLike | None = attrs.field(init=False, default=None)
     logger: logging.Logger = attrs.field(init=False, default=None)
     steps: List[str] = attrs.field(factory=list)  # List of processing step module names
+    require_complete: bool = attrs.field(default=False)
+    complete_marker: str = attrs.field(default="COMPLETE", converter=str)
     _directory_loggers: dict[Path, logging.Logger] = attrs.field(init=False, factory=dict, repr=False)
     _logger_lock: threading.Lock = attrs.field(init=False, factory=threading.Lock, repr=False)
 
@@ -156,38 +160,76 @@ class DirectoryProcessor:
             error_logger.error(f"Error processing directory: {single_dir}. Exception: {e}")
             raise
 
-    def process_batch(self, ymd: str, batch: int, parallel: bool = False):
+    def process_batch(
+        self,
+        ymd: str,
+        batch: int,
+        parallel: bool = False,
+        require_complete: bool | None = None,
+        complete_marker: str | None = None,
+    ):
         batch_started_at = perf_counter()
         ymd = YMD(ymd)
         directories = self._get_all_repetitions_directories(ymd, batch)
-
-        for step_name in self.steps:
-            step_started_at = perf_counter()
-            step_module = importlib.import_module(step_name)
-            if not getattr(step_module, "can_process_repetitions_in_parallel", False):
-                self.logger.info(f"{step_module} cannot process repetitions in parallel.")
-                # Run this step sequentially
-                for directory in directories:
-                    self._run_processing_step(step_name, directory, ymd, batch, None)
-            elif parallel:
-                self.logger.info(
-                    "%s will process repetitions in parallel with workers=%s.",
-                    step_module,
-                    self._get_parallel_workers() if self._get_parallel_workers() is not None else "default",
-                )
-                # Run this step in parallel
-                self._run_steps_in_parallel(step_name, directories, ymd, batch)
-            else:
-                self.logger.info(f"{step_module} can process repetitions in parallel, but not requested.")
-                for directory in directories:
-                    self._run_processing_step(step_name, directory, ymd, batch, None)
-            self._log_profile(
-                "batch_step step=%s dirs=%d parallel=%s elapsed=%.3fs",
-                step_name,
-                len(directories),
-                parallel and getattr(step_module, "can_process_repetitions_in_parallel", False),
-                perf_counter() - step_started_at,
+        require_complete = self.require_complete if require_complete is None else require_complete
+        complete_marker = self.complete_marker if complete_marker is None else str(complete_marker)
+        if require_complete:
+            self._validate_complete_marker(complete_marker)
+            original_directory_count = len(directories)
+            directories, skipped_directories = self._split_complete_repetition_directories(
+                directories,
+                complete_marker,
             )
+            self.logger.info(
+                "Batch snapshot for %s batch %s requires marker %s: selected %d of %d repetition directories.",
+                ymd,
+                batch,
+                complete_marker,
+                len(directories),
+                original_directory_count,
+            )
+            if skipped_directories:
+                self.logger.info(
+                    "Skipping repetition directories without %s at batch startup: %s",
+                    complete_marker,
+                    ", ".join(str(directory) for directory in skipped_directories),
+                )
+        else:
+            self.logger.info(
+                "Batch snapshot for %s batch %s selected %d repetition directories.",
+                ymd,
+                batch,
+                len(directories),
+            )
+
+        with processed_file_scope(directories if require_complete else None):
+            for step_name in self.steps:
+                step_started_at = perf_counter()
+                step_module = importlib.import_module(step_name)
+                if not getattr(step_module, "can_process_repetitions_in_parallel", False):
+                    self.logger.info(f"{step_module} cannot process repetitions in parallel.")
+                    # Run this step sequentially
+                    for directory in directories:
+                        self._run_processing_step(step_name, directory, ymd, batch, None)
+                elif parallel:
+                    self.logger.info(
+                        "%s will process repetitions in parallel with workers=%s.",
+                        step_module,
+                        self._get_parallel_workers() if self._get_parallel_workers() is not None else "default",
+                    )
+                    # Run this step in parallel
+                    self._run_steps_in_parallel(step_name, directories, ymd, batch)
+                else:
+                    self.logger.info(f"{step_module} can process repetitions in parallel, but not requested.")
+                    for directory in directories:
+                        self._run_processing_step(step_name, directory, ymd, batch, None)
+                self._log_profile(
+                    "batch_step step=%s dirs=%d parallel=%s elapsed=%.3fs",
+                    step_name,
+                    len(directories),
+                    parallel and getattr(step_module, "can_process_repetitions_in_parallel", False),
+                    perf_counter() - step_started_at,
+                )
         self._log_profile(
             "process_batch ymd=%s batch=%s dirs=%d elapsed=%.3fs",
             ymd,
@@ -201,7 +243,15 @@ class DirectoryProcessor:
         parallel_workers = self._get_parallel_workers()
         with concurrent.futures.ThreadPoolExecutor(max_workers=parallel_workers) as executor:
             futures = [
-                executor.submit(self._run_processing_step, step_name, directory, ymd, batch, None)
+                executor.submit(
+                    contextvars.copy_context().run,
+                    self._run_processing_step,
+                    step_name,
+                    directory,
+                    ymd,
+                    batch,
+                    None,
+                )
                 for directory in directories
             ]
             for future in concurrent.futures.as_completed(futures):
@@ -218,7 +268,29 @@ class DirectoryProcessor:
         Returns the list of Path objects for all repetition directories in a batch.
         """
         base_dir = self.defaults.data_dir / ymd.get_year() / str(ymd)
-        return list(base_dir.glob(f"{ymd}_{batch}_*/"))
+        return sorted(
+            base_dir.glob(f"{ymd}_{batch}_*/"),
+            key=lambda directory: extract_metadata_from_path(directory)[2],
+        )
+
+    def _validate_complete_marker(self, complete_marker: str):
+        marker_path = Path(complete_marker)
+        if not complete_marker or marker_path.is_absolute():
+            raise ValueError("--complete-marker must be a relative file name.")
+
+    def _split_complete_repetition_directories(
+        self,
+        directories: List[Path],
+        complete_marker: str,
+    ) -> tuple[List[Path], List[Path]]:
+        complete_directories = []
+        incomplete_directories = []
+        for directory in directories:
+            if (directory / complete_marker).is_file():
+                complete_directories.append(directory)
+            else:
+                incomplete_directories.append(directory)
+        return complete_directories, incomplete_directories
 
     def _resolve_directory(
         self, single_dir: Optional[Path], ymd: Optional[str], batch: Optional[int], repetition: Optional[int]
@@ -335,6 +407,16 @@ def build_arg_parser():
         type=int,
         help="Maximum number of worker threads for parallel repetition processing. Defaults to ThreadPoolExecutor behavior.",
     )
+    parser.add_argument(
+        "--require-complete",
+        action="store_true",
+        help="Only process repetition directories that contain the completion marker at batch startup.",
+    )
+    parser.add_argument(
+        "--complete-marker",
+        default="COMPLETE",
+        help="Completion marker file name to require inside each repetition directory when --require-complete is used.",
+    )
     return parser
 
 
@@ -383,7 +465,13 @@ def main(argv: list[str] | None = None):
     if args.repetition is not None:
         parser.error("--repetition only applies to single-directory processing.")
 
-    processor.process_batch(ymd=args.ymd, batch=args.batch, parallel=args.parallel)
+    processor.process_batch(
+        ymd=args.ymd,
+        batch=args.batch,
+        parallel=args.parallel,
+        require_complete=args.require_complete,
+        complete_marker=args.complete_marker,
+    )
 
 
 if __name__ == "__main__":

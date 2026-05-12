@@ -7,8 +7,20 @@ from types import SimpleNamespace
 import pytest
 
 import directory_processor
+import utilities
 from directory_processor import STEP_PRESETS, DirectoryProcessor, resolve_requested_steps
 from YMD_class import YMD, extract_metadata_from_path
+
+
+def _make_repetition_dir(mini_dataset, repetition: int) -> Path:
+    repetition_dir = (
+        mini_dataset.defaults.data_dir
+        / mini_dataset.ymd[:4]
+        / mini_dataset.ymd
+        / f"{mini_dataset.ymd}_{mini_dataset.batch_num}_{repetition}"
+    )
+    repetition_dir.mkdir(parents=True, exist_ok=True)
+    return repetition_dir
 
 
 def test_directory_processor_startup_is_lazy(mini_dataset):
@@ -178,8 +190,8 @@ def test_directory_processor_uses_configured_parallel_workers(mini_dataset, monk
         def __exit__(self, exc_type, exc, tb):
             return False
 
-        def submit(self, fn, step_name, directory, ymd, batch, repetition):
-            fn(step_name, directory, ymd, batch, repetition)
+        def submit(self, fn, *args):
+            fn(*args)
             future = directory_processor.concurrent.futures.Future()
             future.set_result(None)
             return future
@@ -207,6 +219,93 @@ def test_directory_processor_uses_configured_parallel_workers(mini_dataset, monk
         ("fake_step", mini_dataset.repetition_dir),
         ("fake_step", second_dir),
     ]
+
+
+def test_directory_processor_batch_includes_all_repetitions_by_default(mini_dataset, monkeypatch):
+    processor = DirectoryProcessor(defaults=mini_dataset.defaults, steps=["fake_step"])
+    repetition_2_dir = _make_repetition_dir(mini_dataset, 2)
+    repetition_1_dir = _make_repetition_dir(mini_dataset, 1)
+    calls: list[Path] = []
+
+    fake_module = SimpleNamespace(
+        requires_logbook_reader=False,
+        can_process_repetitions_in_parallel=False,
+        can_run=lambda dir_path, defaults, logbook_reader, logger: True,
+        run=lambda dir_path, defaults, logbook_reader, logger: calls.append(dir_path),
+    )
+
+    monkeypatch.setattr(
+        directory_processor,
+        "importlib",
+        SimpleNamespace(import_module=lambda name: fake_module),
+    )
+
+    processor.process_batch(mini_dataset.ymd, mini_dataset.batch_num)
+
+    assert calls == [
+        mini_dataset.repetition_dir,
+        repetition_1_dir,
+        repetition_2_dir,
+    ]
+
+
+def test_directory_processor_batch_requires_complete_marker_snapshot(mini_dataset, monkeypatch):
+    processor = DirectoryProcessor(defaults=mini_dataset.defaults, steps=["fake_step"])
+    incomplete_dir = _make_repetition_dir(mini_dataset, 1)
+    complete_dir = _make_repetition_dir(mini_dataset, 2)
+    (mini_dataset.repetition_dir / "COMPLETE").touch()
+    (complete_dir / "COMPLETE").touch()
+    calls: list[Path] = []
+
+    fake_module = SimpleNamespace(
+        requires_logbook_reader=False,
+        can_process_repetitions_in_parallel=False,
+        can_run=lambda dir_path, defaults, logbook_reader, logger: True,
+        run=lambda dir_path, defaults, logbook_reader, logger: calls.append(dir_path),
+    )
+
+    monkeypatch.setattr(
+        directory_processor,
+        "importlib",
+        SimpleNamespace(import_module=lambda name: fake_module),
+    )
+
+    processor.process_batch(mini_dataset.ymd, mini_dataset.batch_num, require_complete=True)
+
+    assert incomplete_dir not in calls
+    assert calls == [
+        mini_dataset.repetition_dir,
+        complete_dir,
+    ]
+
+
+def test_directory_processor_scopes_processed_files_to_complete_snapshot(mini_dataset, monkeypatch):
+    processor = DirectoryProcessor(defaults=mini_dataset.defaults, steps=["fake_step"])
+    incomplete_dir = _make_repetition_dir(mini_dataset, 1)
+    incomplete_file = incomplete_dir / f"MOUSE_{mini_dataset.ymd}_{mini_dataset.batch_num}_1.nxs"
+    incomplete_file.write_bytes(b"incomplete")
+    (mini_dataset.repetition_dir / "COMPLETE").touch()
+    seen_files: list[Path] = []
+
+    fake_module = SimpleNamespace(
+        requires_logbook_reader=False,
+        can_process_repetitions_in_parallel=False,
+        can_run=lambda dir_path, defaults, logbook_reader, logger: True,
+        run=lambda dir_path, defaults, logbook_reader, logger: seen_files.extend(
+            utilities.get_processed_files(dir_path)
+        ),
+    )
+
+    monkeypatch.setattr(
+        directory_processor,
+        "importlib",
+        SimpleNamespace(import_module=lambda name: fake_module),
+    )
+
+    processor.process_batch(mini_dataset.ymd, mini_dataset.batch_num, require_complete=True)
+
+    assert mini_dataset.output_file in seen_files
+    assert incomplete_file not in seen_files
 
 
 def test_directory_processor_resolve_directory_accepts_repetition_zero(mini_dataset):
@@ -293,11 +392,13 @@ def test_main_uses_step_preset_for_batch(mini_dataset, monkeypatch):
         },
     )
 
-    def fake_process_batch(self, ymd, batch, parallel):
+    def fake_process_batch(self, ymd, batch, parallel, require_complete=None, complete_marker=None):
         recorded["steps"] = self.steps
         recorded["ymd"] = ymd
         recorded["batch"] = batch
         recorded["parallel"] = parallel
+        recorded["require_complete"] = require_complete
+        recorded["complete_marker"] = complete_marker
 
     monkeypatch.setattr(DirectoryProcessor, "process_batch", fake_process_batch)
 
@@ -320,6 +421,58 @@ def test_main_uses_step_preset_for_batch(mini_dataset, monkeypatch):
         "ymd": mini_dataset.ymd,
         "batch": mini_dataset.batch_num,
         "parallel": True,
+        "require_complete": False,
+        "complete_marker": "COMPLETE",
+    }
+
+
+def test_main_forwards_complete_marker_options(mini_dataset, monkeypatch):
+    recorded: dict[str, object] = {}
+
+    monkeypatch.setattr(
+        directory_processor,
+        "load_config_from_yaml",
+        lambda path: {
+            "vsi_root": str(mini_dataset.defaults.vsi_root),
+            "post_translation_dir": str(mini_dataset.defaults.post_translation_dir),
+            "translator_template_dir": str(mini_dataset.defaults.translator_template_dir),
+            "saxs_dir": str(mini_dataset.defaults.saxs_dir),
+            "data_dir": str(mini_dataset.defaults.data_dir),
+            "masks_dir": str(mini_dataset.defaults.masks_dir),
+            "projects_dir": str(mini_dataset.defaults.projects_dir),
+            "logbook_file": str(mini_dataset.defaults.logbook_file),
+            "stacker_config_file": str(mini_dataset.defaults.stacker_config_file),
+            "logging_level": mini_dataset.defaults.logging_level,
+            "profile_steps": mini_dataset.defaults.profile_steps,
+            "log_per_datafile": mini_dataset.defaults.log_per_datafile,
+        },
+    )
+
+    def fake_process_batch(self, ymd, batch, parallel, require_complete=None, complete_marker=None):
+        recorded["require_complete"] = require_complete
+        recorded["complete_marker"] = complete_marker
+
+    monkeypatch.setattr(DirectoryProcessor, "process_batch", fake_process_batch)
+
+    directory_processor.main(
+        [
+            "--config",
+            "dummy.yaml",
+            "--ymd",
+            mini_dataset.ymd,
+            "--batch",
+            str(mini_dataset.batch_num),
+            "--step-preset",
+            "stackonly",
+            "--require-complete",
+            "--complete-marker",
+            "DONE",
+        ]
+    )
+
+    assert recorded == {
+        "require_complete": True,
+        "complete_marker": "DONE",
     }
 
 
@@ -343,7 +496,7 @@ def test_main_overrides_parallel_workers(mini_dataset, monkeypatch):
         },
     )
 
-    def fake_process_batch(self, ymd, batch, parallel):
+    def fake_process_batch(self, ymd, batch, parallel, require_complete=None, complete_marker=None):
         recorded["parallel_workers"] = self.defaults.parallel_workers
 
     monkeypatch.setattr(DirectoryProcessor, "process_batch", fake_process_batch)

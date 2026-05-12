@@ -1,6 +1,8 @@
 import logging
+from contextlib import contextmanager
+from contextvars import ContextVar
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, Iterable, Iterator, List
 
 import h5py
 import numpy as np
@@ -8,6 +10,27 @@ from HDF5Translator.utils import Q_  # type: ignore
 from skimage import measure, morphology
 
 from YMD_class import extract_metadata_from_path
+
+_BATCH_REPETITION_DIRECTORIES: ContextVar[tuple[Path, ...] | None] = ContextVar(
+    "batch_repetition_directories",
+    default=None,
+)
+
+
+@contextmanager
+def processed_file_scope(repetition_directories: Iterable[Path] | None) -> Iterator[None]:
+    """
+    Restrict batch-wide processed-file discovery to a fixed repetition snapshot.
+    """
+    if repetition_directories is None:
+        yield
+        return
+
+    token = _BATCH_REPETITION_DIRECTORIES.set(tuple(Path(path) for path in repetition_directories))
+    try:
+        yield
+    finally:
+        _BATCH_REPETITION_DIRECTORIES.reset(token)
 
 
 def get_float_from_h5(filename: Path, HDFPath: str, logger: logging.Logger) -> float:
@@ -65,11 +88,25 @@ def get_pint_quantity_from_h5(filename: Path, HDFPath: str, logger: logging.Logg
     return pint_quantity
 
 
-def get_processed_files(dir_path: Path) -> List[Path]:
-    ymd, batch, repetition = extract_metadata_from_path(dir_path)
-    parent_path = dir_path.parent
-    # print(parent_path)
-    processed_files = list(parent_path.glob(f"{ymd.YMD}_{batch}_*/MOUSE_{ymd.YMD}_{batch}_*.nxs"))
+def get_processed_files(dir_path: Path, repetition_directories: Iterable[Path] | None = None) -> List[Path]:
+    ymd, batch, _ = extract_metadata_from_path(dir_path)
+    scoped_directories = (
+        tuple(Path(path) for path in repetition_directories)
+        if repetition_directories is not None
+        else _BATCH_REPETITION_DIRECTORIES.get()
+    )
+    if scoped_directories is None:
+        parent_path = dir_path.parent
+        # print(parent_path)
+        processed_files = list(parent_path.glob(f"{ymd.YMD}_{batch}_*/MOUSE_{ymd.YMD}_{batch}_*.nxs"))
+        return processed_files
+
+    processed_files = []
+    for repetition_dir in scoped_directories:
+        scoped_ymd, scoped_batch, _ = extract_metadata_from_path(repetition_dir)
+        if scoped_ymd.YMD != ymd.YMD or scoped_batch != batch:
+            continue
+        processed_files.extend(repetition_dir.glob(f"MOUSE_{ymd.YMD}_{batch}_*.nxs"))
     return processed_files
 
 

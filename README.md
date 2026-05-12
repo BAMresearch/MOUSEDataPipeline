@@ -177,6 +177,17 @@ If the storage backend is the bottleneck, you can also tune the worker count dir
   --step-preset preprocess
 ```
 
+When measurements are still arriving, you can restrict a batch run to repetition directories that already contain a completion marker at startup:
+
+```zsh
+./.venv/bin/mouse-directory-processor --config MOUSE_settings.yaml \
+  --ymd 20250101 --batch 21 --parallel \
+  --step-preset preprocess \
+  --require-complete
+```
+
+By default the marker is a file named `COMPLETE` inside each repetition directory. Use `--complete-marker DONE` if your acquisition system writes a different marker file.
+
 If you want to run only the stacking step for a batch, use:
 
 ```zsh
