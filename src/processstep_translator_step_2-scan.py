@@ -25,7 +25,7 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
     """
     Executes the first translator processing step.
     """
-    ymd, batch, repetition = extract_metadata_from_path(dir_path.parent.parent)
+    ymd, batch, repetition = extract_metadata_from_path(dir_path)
     try:
 
         # encode: python3 -m HDF5Translator -C BAM_new_MOUSE_dectris_adder_configuration.yaml -I ./20250101_17_0/eiger_3_master.h5 -T ./20250101_17_0/testBAM.nxs -O ./20250101_17_0/testBAM_Dadd.nxs -d
