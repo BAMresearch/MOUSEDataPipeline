@@ -127,6 +127,61 @@ def reflectionAnalysis(imageData: np.ndarray, ROI_SIZE: int,
 
     return weighted_center_of_mass, ITotal_region
 
+def reflectionAnalysisBeamSubtracted(imageData: np.ndarray, ROI_SIZE: int,
+                                     direct_beam_data: np.ndarray,
+                                     incident_angle: float,
+                                     distance: float,
+                                     pixel_size_y: float) -> (tuple, float):
+
+    def reduce_and_mask(data):
+        while data.ndim > 2:
+            data = np.mean(data, axis=0)
+
+        # Step 2: get rid of masked or pegged pixels on an Eiger detector
+        labeled_foreground = (np.logical_and(data >= 0, data <= 1e9)).astype(int)
+        maskedTwoDImage = data * labeled_foreground  # apply mask
+        return maskedTwoDImage
+
+    imageData = reduce_and_mask(imageData)
+    direct_beam_data = reduce_and_mask(direct_beam_data)
+
+    # subtract direct beam from image
+    image_sub = imageData - direct_beam_data
+
+    threshold_value = np.maximum(
+        1, 1e-6 * image_sub.max()
+    )  # filters.threshold_otsu(image_sub) # ignore zero pixels
+    labeled_peak = (image_sub > threshold_value).astype(int)  # label peak
+    properties = regionprops(labeled_peak, imageData)  # calculate region properties
+    center_of_mass = None
+    if len(properties) > 0:
+        center_of_mass = properties[0].centroid  # center of mass (unweighted by intensity)
+        weighted_center_of_mass = properties[
+            0
+        ].weighted_centroid  # center of mass (weighted)
+        # determine the total intensity in the region of interest, this will be later divided by measuremet time to get the flux
+        ITotal_region = np.sum(
+            image_sub[
+                np.maximum(int(weighted_center_of_mass[0] - ROI_SIZE), 0) : np.minimum(
+                    int(weighted_center_of_mass[0] + ROI_SIZE), image_sub.shape[0]
+                ),
+                np.maximum(int(weighted_center_of_mass[1] - ROI_SIZE), 0) : np.minimum(
+                    int(weighted_center_of_mass[1] + ROI_SIZE), image_sub.shape[1]
+                ),
+            ]
+        )
+    else:
+        weighted_center_of_mass = None
+        ITotal_region = 0 
+    # for your info:
+    logging.debug(f"{center_of_mass=}")
+    logging.debug(f"{ITotal_region=} counts")
+
+    return weighted_center_of_mass, ITotal_region
+
+
+
+
 def apparent_angle(beam_com, refl_com, distance, pixelsize):
     height_px = beam_com - refl_com
     height_m = height_px * pixelsize
@@ -169,6 +224,7 @@ def main(
     ReflectionFluxOutPath = "/entry1/processing/specular_reflection/flux"
     ReflectionPositionOutPath = "/entry1/processing/specular_reflection/centerOfMass"
     DataPath = "/entry1/instrument/detector00/data"
+    BeamDataPath = "/entry1/processing/direct_beam_profile/data"  # 2 frames
     BeamDurationPath = (
             "/entry1/instrument/detector00/count_time"
             #"/entry1/instrument/detector00/detectorSpecific/frame_count_time"
@@ -199,6 +255,8 @@ def main(
         distance = h5_in[DetectorDistancePath][()].item()
         pixel_size_y = h5_in[PixelSizeYPath][()].item()
         transmission = h5_in[TransmissionPath][()].item()
+        direct_beam_data = h5_in[BeamDataPath][()]
+        
 
     # Now you can do operations, such as determining a beam center and flux. For that, we need to
     # do a few steps...
@@ -217,8 +275,11 @@ def main(
     if ITotal_region is not None and center_of_mass is not None:
             angle_apparent = apparent_angle(beamcenter[0], center_of_mass[0], distance, pixel_size_y)
     else:
-        angle_apparent = incident_angle
+        angle_apparent = np.abs(incident_angle)
         center_of_mass = (0,0)
+        center_of_mass, ITotal_region = reflectionAnalysisBeamSubtracted(imageData, ROI_SIZE, direct_beam_data, incident_angle, distance, pixel_size_y)
+
+        
         
     qz = 4*np.pi/wavelength*np.sin(np.deg2rad(incident_angle))
     qz_apparent = 4*np.pi/wavelength*np.sin(np.deg2rad(angle_apparent))
