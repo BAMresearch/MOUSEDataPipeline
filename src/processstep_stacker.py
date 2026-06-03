@@ -20,7 +20,7 @@ can_process_repetitions_in_parallel = (
 
 
 def processing_needed_for_config(
-    dir_path: Path, ymd: YMD, batch: str, config: str, processed_files: List[Path], logger: logging.Logger
+    dir_path: Path, ymd: YMD, batch: int, config: str, processed_files: List[Path], logger: logging.Logger
 ) -> bool:
     parent_path = dir_path.parent
     stacked_file = (
