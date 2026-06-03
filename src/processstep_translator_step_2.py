@@ -1,5 +1,6 @@
 import logging
 import subprocess
+import sys
 from pathlib import Path
 
 from defaults_carrier import DefaultsCarrier
@@ -53,7 +54,7 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: LogbookReader
         template_file = dir_path / f"MOUSE_{ymd}_{batch}_{repetition}_step_1.nxs"
         output_file = dir_path / f"MOUSE_{ymd}_{batch}_{repetition}.nxs"
         cmd = [
-            "python3",
+            sys.executable,
             "-m",
             "HDF5Translator",
             "-C",

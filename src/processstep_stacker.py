@@ -1,5 +1,6 @@
 import logging
 import subprocess
+import sys
 from pathlib import Path
 from typing import List
 
@@ -88,7 +89,7 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: LogbookReader
             )  # Assuming a naming convention for the stacked file
             # output_file = dir_path.parent / 'translated.nxs'
             cmd = [
-                "python3",
+                sys.executable,
                 str(pto_file),
                 "-c",
                 str(defaults.stacker_config_file),
