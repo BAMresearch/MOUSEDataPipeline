@@ -21,6 +21,22 @@ def can_run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2M
 
     return True
 
+def determine_calibration_configuration(ymd: str):
+    """
+    Selects the translator configuration / calibration suitable for the given ymd.
+
+    The limits of the ymd range are estimated in some cases.
+    Known calibrations and stage position changes:
+    - 2026-02-25: forward one position on the kinematic feet
+    """
+    if int(ymd) >= 20260209:
+        return 'BAM_new_MOUSE_xenocs_translator_configuration-gi.yaml'
+    elif 20251211 <= int(ymd) < 20260209:
+        return 'outdated_20260209/BAM_new_MOUSE_xenocs_translator_configuration-gi.yaml'
+    else:
+        return 'outdated_20251112/BAM_new_MOUSE_xenocs_translator_configuration-gi.yaml'
+
+
 def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2MouseReader, logger: logging.Logger):
     """
     Executes the first translator processing step.
@@ -33,9 +49,10 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
 
         input_file = dir_path / 'im_craw.nxs'
         output_file = dir_path / f'MOUSE_{ymd}_{batch}_{repetition}_step_1.nxs'
+        translator_configuration = determine_calibration_configuration(ymd)
         cmd = [
             'python3', '-m', 'HDF5Translator',
-            '-C', str(defaults.translator_template_dir / 'BAM_new_MOUSE_xenocs_translator_configuration-gi.yaml'),
+            '-C', str(defaults.translator_template_dir / translator_configuration),
             '-I', str(input_file),
             '-O', str(output_file),
             '-d'
