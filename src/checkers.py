@@ -22,7 +22,7 @@ def processing_possible(dir_path: Path, return_list:bool = False) -> bool:
     """
     missing_list = []
 
-    if not (len_files_in_path(dir_path, '*/eiger_*_master.h5')==2):
+    if not (len_files_in_path(dir_path, '*/*_*_master.h5')==2):
         # missing direct beam and/or direct beam through sample files
         missing_list.append('*/eiger_*_master.h5')
 
@@ -30,7 +30,7 @@ def processing_possible(dir_path: Path, return_list:bool = False) -> bool:
         # missing im_craw for direct beam and/or direct beam through sample files
         missing_list.append('*/im_craw.nxs')
 
-    if not (len_files_in_path(dir_path, 'eiger_*_master.h5') == 1):
+    if not (len_files_in_path(dir_path, '*_*_master.h5') == 1):
         # missing or too many eiger files. 
         missing_list.append('eiger_*_master.h5')
 
