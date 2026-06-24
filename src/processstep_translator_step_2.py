@@ -21,6 +21,20 @@ def can_run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2M
 
     return True
 
+def determine_translator_configuration(ymd: str):
+    """
+    Selects the translator configuration / calibration suitable for the given ymd.
+
+    Before 2025, the detector was configured to yield files
+    starting with 'series' instead of 'eiger'. 
+    """
+    if int(ymd) >= 20250101:
+        return 'BAM_new_MOUSE_dectris_adder_configuration.yaml'
+    else:
+        return 'outdated_20241231/BAM_new_MOUSE_dectris_adder_configuration.yaml'
+
+
+
 def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2MouseReader, logger: logging.Logger):
     """
     Executes the first translator processing step.
@@ -33,9 +47,10 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
         input_file = next(dir_path.glob('*_*_master.h5'), None)
         template_file = dir_path / f'MOUSE_{ymd}_{batch}_{repetition}_step_1.nxs'
         output_file = dir_path / f'MOUSE_{ymd}_{batch}_{repetition}.nxs'
+        translator_configuration = determine_translator_configuration(ymd.__repr__())
         cmd = [
             'python3', '-m', 'HDF5Translator',
-            '-C', str(defaults.translator_template_dir / 'BAM_new_MOUSE_dectris_adder_configuration.yaml'),
+            '-C', str(defaults.translator_template_dir / translator_configuration),
             '-T', str(template_file),
             '-I', str(input_file),
             '-O', str(output_file), 
