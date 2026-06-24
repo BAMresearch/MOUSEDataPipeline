@@ -49,7 +49,7 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
 
         input_file = dir_path / 'im_craw.nxs'
         output_file = dir_path / f'MOUSE_{ymd}_{batch}_{repetition}_step_1.nxs'
-        translator_configuration = determine_calibration_configuration(ymd)
+        translator_configuration = determine_calibration_configuration(ymd.__repr__())
         cmd = [
             'python3', '-m', 'HDF5Translator',
             '-C', str(defaults.translator_template_dir / translator_configuration),
