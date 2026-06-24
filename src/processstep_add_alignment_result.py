@@ -40,7 +40,7 @@ def get_pitch(filename: Path, logger: logging.Logger) -> float:
     except Exception as e:
         logger.error(f"Error reading pitch from file: {e}")
         pitchgi = 0
-    return pitchgi
+    return pitchgi.astype("float")
 
 def findentry(ymd:YMD, batch:int, logbook_reader: Logbook2MouseReader):
     # print(f'searching for {ymd.YMD} and {batch}, type {type(ymd.YMD)} and {type(batch)}')
