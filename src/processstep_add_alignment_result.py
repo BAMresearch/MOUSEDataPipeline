@@ -108,7 +108,7 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
                 destination="/entry1/sample/transformations/meridional_angle",
                 source_units="deg",
                 destination_units="deg",
-                transformation=f'lambda x: {horizontal_pitch} - float(x)',
+                transformation=f'lambda x: {horizontal_pitch} - float(x[0])',
                 attributes={
                     "note": f"Added from the alignment result file {aligned_file.as_posix()} by the processstep_add_alignment_result.",
                 },
