@@ -30,7 +30,7 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
 
         # encode: python3 -m HDF5Translator -C BAM_new_MOUSE_dectris_adder_configuration.yaml -I ./20250101_17_0/eiger_3_master.h5 -T ./20250101_17_0/testBAM.nxs -O ./20250101_17_0/testBAM_Dadd.nxs -d
 
-        input_file = next(dir_path.glob('eiger_*_master.h5'), None)
+        input_file = next(dir_path.glob('*_*_master.h5'), None)
         template_file = dir_path / f'MOUSE_{ymd}_{batch}_{repetition}_step_1.nxs'
         output_file = dir_path / f'MOUSE_{ymd}_{batch}_{repetition}.nxs'
         cmd = [
