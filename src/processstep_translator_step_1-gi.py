@@ -55,7 +55,8 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
             '-C', str(defaults.translator_template_dir / translator_configuration),
             '-I', str(input_file),
             '-O', str(output_file),
-            '-d'
+            '-d',
+            '-v'
         ]
         logger.info(f"Starting translator step 1 for {input_file}")
         result = subprocess.run(cmd, check=True, capture_output=True, text=True)
