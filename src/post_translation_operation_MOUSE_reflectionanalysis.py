@@ -220,6 +220,7 @@ def main(
     reflectionGroupPath = "/entry1/processing/specular_reflection/"
     qzOutPath = "/entry1/processing/specular_reflection/qz"
     qz_apparentOutPath = "/entry1/processing/specular_reflection/qz_apparent"
+    FootprintOutPath = "/entry1/processing/specular_reflection/footprint"
     ReflectionOutPath = "/entry1/processing/specular_reflection/reflectivity"
     ReflectionFluxOutPath = "/entry1/processing/specular_reflection/flux"
     ReflectionPositionOutPath = "/entry1/processing/specular_reflection/centerOfMass"
@@ -419,10 +420,21 @@ def main(
     sampleBeamFlux = ITotal_region / recordingTime
 
     if directBeamFlux is not None and sampleBeamFlux is not None:
-        #transmission = sampleBeamFlux / directBeamFlux
-        reflection = sampleBeamFlux / (directBeamFlux * (1-2*transmission))
+        footprint = 1-2*transmission
+        reflection = sampleBeamFlux / (directBeamFlux * footprint)
         logging.info(f"Adding reflectivity to the file: {reflection}")
         TElements += [
+            TranslationElement(
+                # source is none since we're storing derived data
+                destination=FootprintOutPath,
+                minimum_dimensionality=1,
+                data_type="float32",
+                default_value=footprint,
+                destination_units="",
+                attributes={
+                    "note": "Determined by the reflectionanalysis post-translation processing script."
+                },
+            ),
             TranslationElement(
                 # source is none since we're storing derived data
                 destination=ReflectionOutPath,
