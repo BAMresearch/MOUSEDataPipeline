@@ -421,6 +421,8 @@ def main(
 
     if directBeamFlux is not None and sampleBeamFlux is not None:
         footprint = 1-2*transmission
+        if footprint < 0:  # would mean not hitting the sample at al, in which case transmission would be 1
+            footprint = 1 - transmission  # assume the spill is only on one side
         reflection = sampleBeamFlux / (directBeamFlux * footprint)
         logging.info(f"Adding reflectivity to the file: {reflection}")
         TElements += [
