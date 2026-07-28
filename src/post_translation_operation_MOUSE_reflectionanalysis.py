@@ -220,7 +220,7 @@ def main(
     reflectionGroupPath = "/entry1/processing/specular_reflection/"
     qzOutPath = "/entry1/processing/specular_reflection/qz"
     qz_apparentOutPath = "/entry1/processing/specular_reflection/qz_apparent"
-    FootprintOutPath = "/entry1/processing/specular_reflection/footprint"
+    FootprintPath = "/entry1/processing/specular_reflection/footprint"
     ReflectionOutPath = "/entry1/processing/specular_reflection/reflectivity"
     ReflectionFluxOutPath = "/entry1/processing/specular_reflection/flux"
     ReflectionPositionOutPath = "/entry1/processing/specular_reflection/centerOfMass"
@@ -257,6 +257,7 @@ def main(
         pixel_size_y = h5_in[PixelSizeYPath][()].item()
         transmission = h5_in[TransmissionPath][()].item()
         direct_beam_data = h5_in[BeamDataPath][()]
+        footprint = h5_in[FootprintPath][()]
         
 
     # Now you can do operations, such as determining a beam center and flux. For that, we need to
@@ -420,9 +421,6 @@ def main(
     sampleBeamFlux = ITotal_region / recordingTime
 
     if directBeamFlux is not None and sampleBeamFlux is not None:
-        footprint = 1-2*transmission
-        if footprint < 0:  # would mean not hitting the sample at al, in which case transmission would be 1
-            footprint = 1 - transmission  # assume the spill is only on one side
         reflection = sampleBeamFlux / (directBeamFlux * footprint)
         logging.info(f"Adding reflectivity to the file: {reflection}")
         TElements += [
