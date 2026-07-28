@@ -69,6 +69,7 @@ def find_aligned_file(defaults: DefaultsCarrier, logbook_reader: Logbook2MouseRe
     entry = findentry(measurement_ymd, batch, logbook_reader)
     # specify batch in the logbook
     alignment_batch = int(float(entry.additional_parameters.get("alignment_batch", 1)))
+    entry_aligned = findentry(measurement_ymd, alignment_batch, logbook_reader)
     # repetition is one - after the alignment scans which are in the *_0 subdir
     data_dir = defaults.saxs_dir / "data" / measurement_ymd.get_year() / str(measurement_ymd) / f"{str(measurement_ymd)}_{alignment_batch}_1"
     aligned_files = list(data_dir.glob("*.nxs"))
@@ -76,7 +77,7 @@ def find_aligned_file(defaults: DefaultsCarrier, logbook_reader: Logbook2MouseRe
     if len(aligned_files) > 0:
         aligned_file = aligned_files[0]
         logger.info(f"Selected alignment result file: {aligned_file}")
-        return aligned_file
+        return aligned_file, entry_aligned
     else:
         logger.warning(f"No suitable alignment found for ymd {measurement_ymd} batch {batch}.")
     
@@ -94,13 +95,14 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
         input_file = dir_path / f'MOUSE_{ymd}_{batch}_{repetition}_step_1.nxs'
         logger.info(f"Starting alignment correction for {input_file}")
 
-        aligned_file = find_aligned_file(defaults, logbook_reader, ymd, batch, logger)
+        aligned_file, entry_aligned = find_aligned_file(defaults, logbook_reader, ymd, batch, logger)
         # print(f'* * * * * * * * Found mask file: {mask_file} for configuration {input_file}')
         if aligned_file is None:
             logger.error(f"No suitable alignment data found for repetition {ymd}_{batch}_{repetition}.")
             return
         horizontal_pitch = get_pitch(aligned_file, logger)
-        print(horizontal_pitch)
+        samplelength = float(entry_aligned.additional_parameters.get("samplelength", 30))
+        logger.info(f"found samplelength {samplelength}")
         # let's add the aligment data from that alignment result file to the input file, using HDF5Translator elements:
         TElements = [
             TranslationElement(
@@ -109,6 +111,16 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
                 source_units="deg",
                 destination_units="deg",
                 transformation=f'lambda x: {horizontal_pitch} - float(x[0])',
+                attributes={
+                    "note": f"Added from the alignment result file {aligned_file.as_posix()} by the processstep_add_alignment_result.",
+                },
+            ),
+            TranslationElement(
+                source=None,
+                destination="/entry1/sample/length",
+                source_units="mm",
+                destination_units="mm",
+                default_value = samplelength,
                 attributes={
                     "note": f"Added from the alignment result file {aligned_file.as_posix()} by the processstep_add_alignment_result.",
                 },
