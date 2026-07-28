@@ -118,6 +118,8 @@ def run(dir_path: Path, defaults: DefaultsCarrier, logbook_reader: Logbook2Mouse
             TranslationElement(
                 source=None,
                 destination="/entry1/sample/length",
+                minimum_dimensionality=1,
+                data_type="float32",
                 source_units="mm",
                 destination_units="mm",
                 default_value = samplelength,
