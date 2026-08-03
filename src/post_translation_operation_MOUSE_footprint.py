@@ -178,20 +178,25 @@ def main(
     # Now you can do operations, such as determining a beam center and flux. For that, we need to
     # do a few steps...
 
-    sigma_beam = profileAnalysis(direct_beam_data, ROI_SIZE, beamcenter, pixel_size_y*1e3)
-    logging.info(f"beam sigma determined: {sigma_beam} mm")
+    footprint = 1 - 2*transmission
+    if footprint < 0:
+        sigma_beam = profileAnalysis(direct_beam_data, ROI_SIZE, beamcenter, pixel_size_y*1e3)
+        logging.info(f"beam sigma determined: {sigma_beam} mm")
 
-    beam_offset = beam_center_from_transmission(transmission, incident_angle, sample_length, sigma_beam)
-    if beam_offset is not None:
-        logging.info(
-            f"Beam offset: {beam_offset} mm, std: {sigma_beam} mm."
-        )
+        beam_offset = beam_center_from_transmission(transmission, incident_angle, sample_length, sigma_beam)
+        if beam_offset is not None:
+            logging.info(
+                f"Beam offset: {beam_offset} mm, std: {sigma_beam} mm."
+            )
+        else:
+            logging.info(
+                f"Beam width and offset could not be determined."
+            )
+        footprint = pitchgi_footprint(incident_angle, 0, sample_length, 1, beam_offset, sigma_beam)
     else:
-        logging.info(
-            f"Beam width and offset could not be determined."
-        )
+        beam_offset = 0
 
-    footprint = pitchgi_footprint(incident_angle, 0, sample_length, 1, beam_offset, sigma_beam)
+
 
     # Now we start the write-back to the HDF5 file, using the TranslationElement class
     # This class lets you configure exactly what the output should look like in the HDF5 file.
