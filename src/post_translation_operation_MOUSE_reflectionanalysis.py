@@ -426,17 +426,6 @@ def main(
         TElements += [
             TranslationElement(
                 # source is none since we're storing derived data
-                destination=FootprintOutPath,
-                minimum_dimensionality=1,
-                data_type="float32",
-                default_value=footprint,
-                destination_units="",
-                attributes={
-                    "note": "Determined by the reflectionanalysis post-translation processing script."
-                },
-            ),
-            TranslationElement(
-                # source is none since we're storing derived data
                 destination=ReflectionOutPath,
                 minimum_dimensionality=1,
                 data_type="float32",
