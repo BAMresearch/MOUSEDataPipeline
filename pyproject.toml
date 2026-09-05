@@ -38,6 +38,7 @@ dev = [
 
 [project.scripts]
 mouse-directory-processor = "directory_processor:main"
+mouse-stacked-to-modacor = "stacked_mouse_to_modacor:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
@@ -47,6 +48,7 @@ py-modules = [
     "defaults_carrier",
     "directory_processor",
     "logbook_support",
+    "stacked_mouse_to_modacor",
     "post_translation_operation_hdf5_stacker",
     "processstep_add_background_files",
     "processstep_add_mask_file",
