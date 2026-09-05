@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import glob
 import shutil
 from pathlib import Path
 
@@ -192,6 +193,35 @@ def convert_stacked_file_to_modacor(
     return datasets_to_pad
 
 
+def modacor_output_path(input_file: Path, suffix: str = "_modacor") -> Path:
+    if input_file.stem.endswith(suffix):
+        raise ValueError(f"{input_file} already appears to use the {suffix!r} suffix")
+    return input_file.with_name(f"{input_file.stem}{suffix}{input_file.suffix}")
+
+
+def expand_input_paths(path_args: list[str]) -> list[Path]:
+    paths: list[Path] = []
+    for path_arg in path_args:
+        if glob.has_magic(path_arg):
+            matches = sorted(Path(match) for match in glob.glob(path_arg))
+            if not matches:
+                raise ValueError(f"input pattern did not match any files: {path_arg}")
+            paths.extend(matches)
+        else:
+            paths.append(Path(path_arg))
+    return paths
+
+
+def conversion_jobs(paths: list[Path], output: Path | None = None, suffix: str = "_modacor") -> list[tuple[Path, Path]]:
+    if output is not None:
+        if len(paths) != 1:
+            raise ValueError("--output can only be used with one input file")
+        return [(paths[0], output)]
+    if len(paths) == 2 and paths[0].is_file() and not paths[1].exists():
+        return [(paths[0], paths[1])]
+    return [(path, modacor_output_path(path, suffix=suffix)) for path in paths]
+
+
 def setup_argparser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
@@ -199,12 +229,31 @@ def setup_argparser() -> argparse.ArgumentParser:
             "with trailing singleton dimensions to match the detector data rank."
         )
     )
-    parser.add_argument("input", type=Path, help="Input stacked .nxs/.h5 file")
-    parser.add_argument("output", type=Path, help="Output MoDaCor-ready stacked file")
+    parser.add_argument(
+        "paths",
+        nargs="+",
+        help=(
+            "Input stacked .nxs/.h5 file(s). With one input, or with multiple existing inputs, "
+            "outputs are written as <stem>_modacor<suffix>. The old 'input output' form is still "
+            "accepted when the second path does not exist."
+        ),
+    )
+    parser.add_argument(
+        "-o",
+        "--output",
+        type=Path,
+        default=None,
+        help="Explicit output path for a single input file.",
+    )
     parser.add_argument(
         "--primary-data-path",
         default=DEFAULT_PRIMARY_DATA_PATH,
         help=f"Detector data path used to determine target rank. Default: {DEFAULT_PRIMARY_DATA_PATH}",
+    )
+    parser.add_argument(
+        "--suffix",
+        default="_modacor",
+        help="Suffix to append to each input stem in auto-output mode. Default: _modacor",
     )
     parser.add_argument("-f", "--force", action="store_true", help="Overwrite the output file if it exists")
     parser.add_argument("--dry-run", action="store_true", help="List datasets that would be padded without writing")
@@ -213,20 +262,23 @@ def setup_argparser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = setup_argparser().parse_args(argv)
-    if args.dry_run:
-        datasets = find_datasets_to_pad(args.input, primary_data_path=args.primary_data_path)
-    else:
-        datasets = convert_stacked_file_to_modacor(
-            args.input,
-            args.output,
-            primary_data_path=args.primary_data_path,
-            overwrite=args.force,
-        )
+    jobs = conversion_jobs(expand_input_paths(args.paths), output=args.output, suffix=args.suffix)
+    for input_file, output_file in jobs:
+        print(f"{input_file} -> {output_file}")
+        if args.dry_run:
+            datasets = find_datasets_to_pad(input_file, primary_data_path=args.primary_data_path)
+        else:
+            datasets = convert_stacked_file_to_modacor(
+                input_file,
+                output_file,
+                primary_data_path=args.primary_data_path,
+                overwrite=args.force,
+            )
 
-    for path, old_shape, new_shape in datasets:
-        print(f"{path}: {old_shape} -> {new_shape}")
-    action = "Would pad" if args.dry_run else "Padded"
-    print(f"{action} {len(datasets)} dataset(s).")
+        for path, old_shape, new_shape in datasets:
+            print(f"  {path}: {old_shape} -> {new_shape}")
+        action = "Would pad" if args.dry_run else "Padded"
+        print(f"{action} {len(datasets)} dataset(s).")
     return 0
 
 

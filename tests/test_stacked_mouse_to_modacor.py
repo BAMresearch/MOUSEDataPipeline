@@ -70,3 +70,38 @@ def test_find_datasets_to_pad_uses_hardcoded_mouse_paths(tmp_path: Path):
         ("entry1/experiment/stage_temperature", (3,), (3, 1, 1, 1)),
         ("entry1/sample/transmission", (3, 1), (3, 1, 1, 1)),
     ]
+
+
+def test_modacor_output_path_appends_suffix_to_stem():
+    assert stacked_mouse_to_modacor.modacor_output_path(Path("MOUSE_1_2_3_stacked.nxs")) == Path(
+        "MOUSE_1_2_3_stacked_modacor.nxs"
+    )
+
+
+def test_conversion_jobs_supports_multiple_auto_outputs(tmp_path: Path):
+    input_a = tmp_path / "a_stacked.nxs"
+    input_b = tmp_path / "b_stacked.nxs"
+    _write_stacked_file(input_a)
+    _write_stacked_file(input_b)
+
+    assert stacked_mouse_to_modacor.conversion_jobs([input_a, input_b]) == [
+        (input_a, tmp_path / "a_stacked_modacor.nxs"),
+        (input_b, tmp_path / "b_stacked_modacor.nxs"),
+    ]
+
+
+def test_expand_input_paths_expands_globs(tmp_path: Path):
+    input_a = tmp_path / "a_stacked.nxs"
+    input_b = tmp_path / "b_stacked.nxs"
+    _write_stacked_file(input_a)
+    _write_stacked_file(input_b)
+
+    assert stacked_mouse_to_modacor.expand_input_paths([str(tmp_path / "*_stacked.nxs")]) == [input_a, input_b]
+
+
+def test_conversion_jobs_preserves_legacy_input_output_form_for_missing_output(tmp_path: Path):
+    input_file = tmp_path / "stacked.nxs"
+    output_file = tmp_path / "explicit_output.nxs"
+    _write_stacked_file(input_file)
+
+    assert stacked_mouse_to_modacor.conversion_jobs([input_file, output_file]) == [(input_file, output_file)]
