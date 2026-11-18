@@ -21,7 +21,7 @@ from processing_marker import MARKER_NAME, MarkerCheck, check_marker, validate_y
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_STATE_DIR = Path("~/.local/state/mouse-ymd-poller")
-TERMINAL_STATUSES = {"processed", "failed", "skipped"}
+TERMINAL_STATUSES = {"processed", "failed", "skipped", "interrupted"}
 
 
 def _now() -> datetime:
@@ -80,15 +80,16 @@ def _markers(data_dir: Path) -> dict[str, Path]:
     markers = {}
     # iterdir surfaces an unavailable share instead of silently treating it as empty.
     for year in sorted(data_dir.iterdir()):
-        if not year.is_dir():
+        if re.fullmatch(r"[0-9]{4}", year.name) is None or not year.is_dir():
             continue
         for directory in sorted(year.iterdir()):
-            if directory.is_dir() and (directory / MARKER_NAME).exists():
+            if not directory.is_dir() or not directory.name.startswith(year.name):
+                continue
+            try:
                 validate_ymd(directory.name)
-                if year.name != directory.name[:4]:
-                    raise ValueError(f"Marker is outside its YMD year directory: {directory}")
-                if directory.name in markers:
-                    raise ValueError(f"Duplicate YMD marker: {directory.name}")
+            except ValueError:
+                continue
+            if (directory / MARKER_NAME).exists():
                 markers[directory.name] = directory
     return dict(sorted(markers.items()))
 
@@ -234,6 +235,15 @@ def _poll(markers: dict[str, Path], states: dict[str, dict], args, processor: Pa
                 flush=True,
             )
             continue
+        if old.get("marker_id") == check.marker_id and old.get("status") == "running" and not old.get("finished"):
+            state = {**old, "status": "interrupted", "finished": _now().isoformat()}
+            _write_state(args.state_dir, ymd, state)
+            print(
+                f"{ymd}: previous run started {old.get('started')} was interrupted; not restarting (use retry {ymd})",
+                flush=True,
+            )
+            attention = True
+            continue
         if manifest.get("marker_id") != check.marker_id:
             # Never use sequences from a different marker than the one whose files were checked.
             check = MarkerCheck(
@@ -254,8 +264,6 @@ def _poll(markers: dict[str, Path], states: dict[str, dict], args, processor: Pa
         if not check.ready:
             attention = _waiting(args.state_dir, ymd, check, old, incomplete, args.overdue_hours) or attention
             continue
-        if old.get("status") == "running" and not old.get("finished"):
-            print(f"{ymd}: recovering an unfinished running attempt", flush=True)
         state = {
             "ymd": ymd,
             "marker_id": check.marker_id,

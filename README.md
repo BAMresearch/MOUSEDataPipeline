@@ -220,6 +220,10 @@ additional files do not block processing. The reference readiness check in
 `src/processing_marker.py` is vendored from `mouse_bluesky` at commit `282a365`.
 Update that module from its source rather than editing the local copy.
 
+Only markers under `<YYYY>/<YYYYMMDD>` are considered: the year must have exactly
+four digits, and the date must be a real calendar date starting with that year.
+The unresolved sentinel `20261232` and all other folder names are ignored silently.
+
 Install or refresh the editable package to register the command:
 
 ```zsh
@@ -262,21 +266,26 @@ full processor stdout and stderr; console output contains summaries and log
 paths. Use the same state directory for scheduled and manual commands.
 A non-blocking lock prevents overlapping polls and protects `mark-done` and
 `retry` from changing state during processing. Corrupt state is reported and
-left untouched. An unfinished `running` attempt is eligible again after a crash.
+left untouched. A run can take up to an hour, so an unfinished `running` attempt
+is never restarted automatically. The next poll records it as `interrupted`,
+keeps its marker ID, start time and incomplete sequences, and alerts once.
+Use `retry <YMD>` to start it again after checking the interrupted run.
 
-A poll exits nonzero when a YMD fails in that poll, a waiting marker first
-becomes overdue, or the poller encounters an error such as invalid configuration,
-an unavailable executable or unreadable state. The default overdue threshold is
-24 hours; set `poll --overdue-hours HOURS` to change it. Waiting for sync, having
-nothing to do, an already recorded failure or overdue condition, and finding
-another poll holding the lock all exit zero. `status` reports problems and exits
-zero. This lets Rundeck failure notifications alert once per processing failure
-or overdue event. Poller/configuration errors continue to fail until repaired.
+A poll exits nonzero when a YMD fails in that poll, an interrupted run is first
+detected, a waiting marker first becomes overdue, or the poller encounters an
+error such as invalid configuration, an unavailable executable or unreadable
+state. The default overdue threshold is 24 hours; set `poll --overdue-hours HOURS`
+to change it. Waiting for sync, having nothing to do, an already recorded failure,
+interruption or overdue condition, and finding another poll holding the lock all
+exit zero. `status` reports problems and exits zero. This lets Rundeck failure
+notifications alert once per processing failure, interruption or overdue event.
+Poller/configuration errors continue to fail until repaired.
 
-Failed markers are not retried automatically: use `retry <YMD>` after resolving
-the cause. A replacement marker with a new ID is eligible regardless of the
-previous result. Attempts retain the ID whose manifest authorised processing,
-so a marker replaced during a run will be picked up on the next poll.
+Failed or interrupted markers are not retried automatically: use `retry <YMD>`
+after resolving the cause. A replacement marker with a new ID is eligible
+regardless of the previous result. Attempts retain the ID whose manifest
+authorised processing, so a marker replaced during a run will be picked up on the
+next poll.
 
 Before enabling the Rundeck job, skip any already processed backlog:
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 import fcntl
 import json
 import os
+import signal
 import subprocess
 import sys
 from datetime import datetime, timedelta, timezone
@@ -49,6 +50,7 @@ def poller(tmp_path, monkeypatch):
         + """
 import json
 import os
+import signal
 import sys
 from pathlib import Path
 
@@ -60,6 +62,9 @@ with open(os.environ["POLLER_CALLS"], "a") as stream:
     stream.write(json.dumps({"args": args, "cwd": os.getcwd(), "path": os.environ["PATH"]}) + "\\n")
 print("processor stdout", flush=True)
 print("processor stderr", file=sys.stderr, flush=True)
+if os.environ.get("POLLER_KILL_PARENT") == "1":
+    os.kill(os.getppid(), signal.SIGKILL)
+    sys.exit(0)
 replacement = os.environ.get("POLLER_REPLACEMENT")
 if replacement:
     info = json.loads(replacement)
@@ -79,6 +84,7 @@ sys.exit(failures.get(f"{ymd}:{batch}:{preset}", 0))
     monkeypatch.setenv("POLLER_CALLS", str(calls_file))
     monkeypatch.delenv("POLLER_FAILURES", raising=False)
     monkeypatch.delenv("POLLER_REPLACEMENT", raising=False)
+    monkeypatch.delenv("POLLER_KILL_PARENT", raising=False)
 
     def marker(ymd=YMD, batches=(2,), incomplete=(), marker_id="a" * 32, extra=()):
         directory = data / ymd[:4] / ymd
@@ -347,21 +353,120 @@ def test_default_processor_is_next_to_active_interpreter(poller, monkeypatch):
     assert len(poller.calls()) == 2
 
 
-def test_stale_running_state_is_recovered(poller, capsys):
-    poller.marker()
+@pytest.mark.parametrize("recovery", ["retry", "new_marker"])
+def test_stale_running_state_is_interrupted_and_requires_recovery(poller, capsys, recovery):
+    directory, manifest = poller.marker(incomplete=(2,))
     poller.state_dir.mkdir()
-    (poller.state_dir / f"{YMD}.json").write_text(
-        json.dumps(
-            {
-                "marker_id": "a" * 32,
-                "status": "running",
-                "started": "2026-11-17T00:00:00+00:00",
-            }
-        )
+    previous = {
+        "marker_id": manifest["marker_id"],
+        "status": "running",
+        "started": "2026-11-17T00:00:00+00:00",
+        "incomplete_sequences": [f"{YMD}_2_0"],
+    }
+    (poller.state_dir / f"{YMD}.json").write_text(json.dumps(previous))
+    assert poller.invoke() == 1
+    interrupted = poller.state()
+    assert interrupted == {**previous, "status": "interrupted", "finished": interrupted["finished"]}
+    assert datetime.fromisoformat(interrupted["finished"]) >= datetime.fromisoformat(previous["started"])
+    assert (
+        f"{YMD}: previous run started {previous['started']} was interrupted; not restarting (use retry {YMD})"
+        in capsys.readouterr().out
     )
+    assert poller.calls() == []
     assert poller.invoke() == 0
-    assert "recovering an unfinished running attempt" in capsys.readouterr().out
+    assert poller.state() == interrupted
+    assert poller.calls() == []
+    assert poller.invoke("status") == 0
+    assert f"{YMD} aaaaaaaa interrupted" in capsys.readouterr().out
+    if recovery == "retry":
+        assert poller.invoke("retry", YMD) == 0
+    else:
+        write_marker_atomically(directory, {**manifest, "marker_id": "b" * 32})
+    assert poller.invoke() == 0
     assert poller.state()["status"] == "processed"
+    assert poller.state()["marker_id"] == (manifest["marker_id"] if recovery == "retry" else "b" * 32)
+    assert len(poller.calls()) == 2
+
+
+def test_killed_poll_is_interrupted_and_not_restarted(poller):
+    poller.marker(incomplete=(2,))
+    command = [
+        sys.executable,
+        str(Path(ymd_poller.__file__)),
+        "poll",
+        "--config",
+        str(poller.config),
+        "--state-dir",
+        str(poller.state_dir),
+    ]
+    result = subprocess.run(
+        command,
+        env={**os.environ, "POLLER_KILL_PARENT": "1"},
+        capture_output=True,
+        text=True,
+        timeout=15,
+    )
+    assert result.returncode == -signal.SIGKILL, result.stderr
+    running = poller.state()
+    assert running["status"] == "running"
+    assert "finished" not in running
+    assert _runs(poller) == [("2", "preprocess")]
+    assert poller.invoke() == 1
+    interrupted = poller.state()
+    assert interrupted == {**running, "status": "interrupted", "finished": interrupted["finished"]}
+    assert _runs(poller) == [("2", "preprocess")]
+    assert poller.invoke() == 0
+    assert poller.state() == interrupted
+    assert _runs(poller) == [("2", "preprocess")]
+
+
+@pytest.mark.parametrize("command", ["poll", "status", "mark-done"])
+def test_non_ymd_marker_folders_are_silently_ignored(poller, capsys, command):
+    invalid_paths = [
+        "2026/20261118_old",
+        "2026/2026111",
+        "2026/20261132",
+        "2026/20261232",
+        "2026/notes",
+        "misc/20261118",
+        "2025/20261118",
+        "20260/20261118",
+        "202/20261118",
+    ]
+    for relative in invalid_paths:
+        directory = poller.data / relative
+        directory.mkdir(parents=True)
+        write_marker_atomically(
+            directory,
+            build_manifest(directory, directory.name, "c" * 32, scan_ymd_dir(directory)),
+        )
+    valid_ymd = "20261119"
+    poller.marker(ymd=valid_ymd)
+    arguments = ["--all-present"] if command == "mark-done" else []
+    assert poller.invoke(command, *arguments) == 0
+    output = capsys.readouterr()
+    lines = output.out.splitlines()
+    assert lines and all(line.startswith(valid_ymd) for line in lines)
+    assert output.err == ""
+    if command == "poll":
+        assert [call["args"][3] for call in poller.calls()] == [valid_ymd, valid_ymd]
+        assert poller.state(valid_ymd)["status"] == "processed"
+    else:
+        assert poller.calls() == []
+    if command == "status":
+        assert len(lines) == 1
+        assert not poller.state_dir.exists()
+    else:
+        assert {path.stem for path in poller.state_dir.glob("*.json")} == {valid_ymd}
+        if command == "mark-done":
+            assert poller.state(valid_ymd)["status"] == "skipped"
+
+
+@pytest.mark.parametrize("command", ["mark-done", "retry"])
+def test_explicit_invalid_ymd_is_still_an_error(poller, command):
+    assert poller.invoke(command, f"{YMD}_old") == 1
+    assert poller.calls() == []
+    assert not list(poller.state_dir.glob("*.json"))
 
 
 def test_status_lists_union_and_reports_new_markers_and_incomplete_counts(poller, capsys):
