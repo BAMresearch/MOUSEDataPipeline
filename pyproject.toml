@@ -39,6 +39,7 @@ dev = [
 [project.scripts]
 mouse-directory-processor = "directory_processor:main"
 mouse-stacked-to-modacor = "stacked_mouse_to_modacor:main"
+mouse-ymd-poller = "ymd_poller:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
@@ -48,6 +49,7 @@ py-modules = [
     "defaults_carrier",
     "directory_processor",
     "logbook_support",
+    "processing_marker",
     "stacked_mouse_to_modacor",
     "post_translation_operation_hdf5_stacker",
     "processstep_add_background_files",
@@ -70,6 +72,7 @@ py-modules = [
     "processstep_transmission_thickness_flux_table",
     "utilities",
     "watcher",
+    "ymd_poller",
 ]
 
 [tool.ruff]
