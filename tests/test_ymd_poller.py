@@ -412,6 +412,55 @@ def test_unreadable_marker_waits_and_nothing_to_do_is_success(poller):
     assert poller.calls() == []
 
 
+@pytest.mark.parametrize("status", ["processed", "failed"])
+def test_unreadable_marker_preserves_recorded_attempt_without_reprocessing(poller, monkeypatch, capsys, status):
+    directory, _ = poller.marker()
+    if status == "failed":
+        monkeypatch.setenv("POLLER_FAILURES", json.dumps({f"{YMD}:2:preprocess": 7}))
+    assert poller.invoke() == (1 if status == "failed" else 0)
+    state_file = poller.state_dir / f"{YMD}.json"
+    recorded = state_file.read_bytes()
+    calls = poller.calls()
+    capsys.readouterr()
+    marker = directory / MARKER_NAME
+    try:
+        marker.chmod(0o000)
+        assert poller.invoke() == 0
+        assert state_file.read_bytes() == recorded
+        assert f"keeping recorded {status} state" in capsys.readouterr().out
+    finally:
+        marker.chmod(0o644)
+    assert poller.invoke() == 0
+    assert poller.state()["status"] == status
+    assert state_file.read_bytes() == recorded
+    assert poller.calls() == calls
+
+
+def test_unreadable_marker_preserves_overdue_waiting_state(poller):
+    directory, _ = poller.marker()
+    (directory / f"{YMD}_2_0/image.h5").unlink()
+    assert poller.invoke() == 0
+    state = poller.state()
+    state["first_seen"] = (datetime.now(timezone.utc) - timedelta(hours=25)).isoformat()
+    state_file = poller.state_dir / f"{YMD}.json"
+    state_file.write_text(json.dumps(state))
+    assert poller.invoke() == 1
+    recorded = state_file.read_bytes()
+    marker = directory / MARKER_NAME
+    try:
+        marker.chmod(0o000)
+        assert poller.invoke() == 0
+        assert state_file.read_bytes() == recorded
+        preserved = poller.state()
+        assert preserved["marker_id"] == state["marker_id"]
+        assert preserved["first_seen"] == state["first_seen"]
+        assert preserved["overdue"] is True
+    finally:
+        marker.chmod(0o644)
+    assert poller.invoke() == 0
+    assert poller.calls() == []
+
+
 def test_state_must_not_be_in_data_tree(poller):
     poller.marker()
     assert poller.invoke("poll", "--state-dir", str(poller.data / "state")) == 1

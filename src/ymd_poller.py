@@ -228,6 +228,12 @@ def _poll(markers: dict[str, Path], states: dict[str, dict], args, processor: Pa
             print(f"{ymd}: {old['status']} (already recorded)")
             continue
         check = check_marker(directory)
+        if check.marker_id is None and ymd in states:
+            print(
+                f"{ymd}: marker unreadable ({check.problem}); keeping recorded {old['status']} state",
+                flush=True,
+            )
+            continue
         if manifest.get("marker_id") != check.marker_id:
             # Never use sequences from a different marker than the one whose files were checked.
             check = MarkerCheck(
