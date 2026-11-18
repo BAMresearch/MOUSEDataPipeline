@@ -1,0 +1,29 @@
+# EXAMPLE ONLY: not tested in Rundeck. Check against the installed Rundeck version.
+# Replace <repo> and the notification placeholder before enabling the job.
+# Commands must execute on the processing host; configure node dispatch if Rundeck
+# runs elsewhere. Skip any processed backlog with mark-done --all-present first.
+# Format reference:
+# https://docs.rundeck.com/docs/manual/document-format-reference/job-yaml-v12.html
+- name: MOUSE finished YMD poller
+  group: MOUSE
+  description: >-
+    Example requiring maintainer review. Poll synced YMD markers on the processing
+    host and alert on new failures or overdue markers. The local state directory
+    belongs to the job's OS user; use that same directory for manual commands.
+  executionEnabled: true
+  scheduleEnabled: true
+  multipleExecutions: false
+  loglevel: INFO
+  schedule:
+    crontab: '0 0/5 * * * ? *'
+  sequence:
+    keepgoing: false
+    strategy: node-first
+    commands:
+      - exec: >-
+          "<repo>/.venv/bin/mouse-ymd-poller" poll --config "<repo>/MOUSE_settings.yaml"
+  # Placeholder: replace with the processing team's notification destination.
+  notification:
+    onfailure:
+      email:
+        recipients: '<failure-email>'

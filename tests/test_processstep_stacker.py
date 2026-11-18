@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import sys
 from types import SimpleNamespace
 
 import processstep_stacker
@@ -37,7 +38,7 @@ def test_stacker_logs_command_without_printing(mini_dataset, monkeypatch, caplog
     assert captured.out == ""
     assert len(calls) == 1
     assert calls[0][:2] == [
-        "python3",
+        sys.executable,
         str(mini_dataset.defaults.post_translation_dir / "post_translation_operation_hdf5_stacker.py"),
     ]
     assert "--match-detector-data-rank" not in calls[0]

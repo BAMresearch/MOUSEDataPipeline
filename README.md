@@ -210,6 +210,96 @@ The shell wrappers in `src/` still work and now delegate to the installed `mouse
 MOUSE_DIRECTORY_PROCESSOR_BIN=mouse-directory-processor ./src/directory_processor_multibatch_nostack.sh 20260311 1 1
 ```
 
+## Automatic processing of finished YMDs
+
+`mouse-ymd-poller` processes a finished measurement date after its
+`<data_dir>/<YYYY>/<YMD>/READY_FOR_PROCESSING.json` marker and all listed files have
+synced. It reads `data_dir` through the same `DefaultsCarrier` configuration as
+the pipeline. Every listed file must exist at exactly the recorded size;
+additional files do not block processing. The reference readiness check in
+`src/processing_marker.py` is vendored from `mouse_bluesky` at commit `282a365`.
+Update that module from its source rather than editing the local copy.
+
+Only markers under `<YYYY>/<YYYYMMDD>` are considered: the year must have exactly
+four digits, and the date must be a real calendar date starting with that year.
+The unresolved sentinel `20261232` and all other folder names are ignored silently.
+
+Install or refresh the editable package to register the command:
+
+```zsh
+./.venv/bin/python -m pip install -e '.[dev]'
+```
+
+The four subcommands all require `--config` and accept `--state-dir`:
+
+```zsh
+# Check markers and process newly ready YMDs.
+./.venv/bin/mouse-ymd-poller poll --config "$PWD/MOUSE_settings.yaml"
+
+# Show each known YMD, its marker ID prefix, status, age and incomplete count.
+./.venv/bin/mouse-ymd-poller status --config "$PWD/MOUSE_settings.yaml"
+
+# Record a marker as skipped, for example after processing it by hand.
+./.venv/bin/mouse-ymd-poller mark-done 20261118 --config "$PWD/MOUSE_settings.yaml"
+
+# Clear the recorded attempt so the next poll can process the YMD again.
+./.venv/bin/mouse-ymd-poller retry 20261118 --config "$PWD/MOUSE_settings.yaml"
+```
+
+For each ready YMD, the poller takes distinct batch numbers from matching marker
+sequences and runs them in ascending order. Each batch runs `preprocess` followed
+by `stackonly`, both with `--parallel`. If preprocessing fails, stacking is
+skipped for that batch and subsequent batches still run. Incomplete sequences
+are listed in the output and state; their batches are still processed.
+
+The processor defaults to `mouse-directory-processor` beside the running Python
+interpreter. Set `MOUSE_DIRECTORY_PROCESSOR_BIN` to override it. Subprocesses run
+from the repository root with an absolute config path and the processor's
+directory first on `PATH`, so helper tools such as `mouse-logbook` come from the
+same environment. Relative paths inside the pipeline config are interpreted
+from the repository root.
+
+State defaults to `~/.local/state/mouse-ymd-poller/`, outside the synced data
+tree. It contains one atomically written JSON file per YMD, a `lock` file and
+attempt logs under `logs/<YMD>_<marker_id[:8]>_<UTC timestamp>.log`. The logs capture
+full processor stdout and stderr; console output contains summaries and log
+paths. Use the same state directory for scheduled and manual commands.
+A non-blocking lock prevents overlapping polls and protects `mark-done` and
+`retry` from changing state during processing. Corrupt state is reported and
+left untouched. A run can take up to an hour, so an unfinished `running` attempt
+is never restarted automatically. The next poll records it as `interrupted`,
+keeps its marker ID, start time and incomplete sequences, and alerts once.
+Use `retry <YMD>` to start it again after checking the interrupted run.
+
+A poll exits nonzero when a YMD fails in that poll, an interrupted run is first
+detected, a waiting marker first becomes overdue, or the poller encounters an
+error such as invalid configuration, an unavailable executable or unreadable
+state. The default overdue threshold is 24 hours; set `poll --overdue-hours HOURS`
+to change it. Waiting for sync, having nothing to do, an already recorded failure,
+interruption or overdue condition, and finding another poll holding the lock all
+exit zero. `status` reports problems and exits zero. This lets Rundeck failure
+notifications alert once per processing failure, interruption or overdue event.
+Poller/configuration errors continue to fail until repaired.
+
+Failed or interrupted markers are not retried automatically: use `retry <YMD>`
+after resolving the cause. A replacement marker with a new ID is eligible
+regardless of the previous result. Attempts retain the ID whose manifest
+authorised processing, so a marker replaced during a run will be picked up on the
+next poll.
+
+Before enabling the Rundeck job, skip any already processed backlog:
+
+```zsh
+./.venv/bin/mouse-ymd-poller mark-done --all-present --config "$PWD/MOUSE_settings.yaml"
+```
+
+The [example Rundeck job](docs/rundeck_ymd_poller.yaml) schedules a poll every five
+minutes with concurrent executions disabled. It has not been tested in Rundeck;
+the maintainer must check its syntax against their Rundeck version, replace the
+repository path and failure notification placeholder, and ensure execution is
+on the processing host. See the official
+[Rundeck job YAML reference](https://docs.rundeck.com/docs/manual/document-format-reference/job-yaml-v12.html).
+
 # top-level methods:
 
 ## 1. `directory_processor`
