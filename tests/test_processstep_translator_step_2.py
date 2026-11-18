@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import sys
 from types import SimpleNamespace
 
 import processstep_translator_step_2
@@ -31,7 +32,7 @@ def test_translator_step_2_shells_out_to_hdf5translator(mini_dataset, monkeypatc
 
     assert calls == [
         [
-            "python3",
+            sys.executable,
             "-m",
             "HDF5Translator",
             "-C",
